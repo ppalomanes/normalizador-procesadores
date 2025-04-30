@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Normalizador de Procesadores - Depurado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <div id="app" class="flex flex-col min-h-screen">
+      <!-- Cabecera -->
+      <header class="bg-blue-700 text-white p-4 shadow-md">
+        <div class="container mx-auto">
+          <h1 class="text-2xl font-bold flex items-center">
+            <span class="mr-2">
+              <i data-lucide="table"></i>
+            </span>
+            Normalizador de Procesadores para Auditoría (Depurado)
+          </h1>
+          <p class="text-blue-100 mt-1">
+            Validación según requisitos: Intel Core i5 3.0 GHz 8va Gen+ / AMD
+            Ryzen 5 3.7 GHz+
+          </p>
+        </div>
+      </header>
+
+      <main class="container mx-auto p-4 flex-grow">
+        <!-- Área de carga de archivos -->
+        <div class="mb-8 bg-white p-6 rounded-lg shadow-md">
+          <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <span class="mr-2 text-blue-600">
+              <i data-lucide="upload"></i>
+            </span>
+            Subir archivo Excel
+          </h2>
+
+          <div
+            class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer"
+          >
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              id="file-upload"
+              class="hidden"
+            />
+            <label for="file-upload" class="cursor-pointer">
+              <div id="upload-area" class="flex flex-col items-center">
+                <div class="mb-4 bg-blue-100 p-3 rounded-full text-blue-600">
+                  <i data-lucide="upload" class="w-6 h-6"></i>
+                </div>
+                <p class="font-medium text-gray-700 mb-1" id="file-name">
+                  Haga clic para seleccionar un archivo
+                </p>
+                <p class="text-sm text-gray-500">
+                  Formatos soportados: .xlsx, .xls
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <div
+            id="error-message"
+            class="mt-4 p-3 bg-red-100 text-red-700 rounded-md flex items-start hidden"
+          >
+            <i
+              data-lucide="alert-circle"
+              class="mr-2 flex-shrink-0 mt-0.5 w-5 h-5"
+            ></i>
+            <p id="error-text"></p>
+          </div>
+        </div>
+
+        <!-- Log de proceso -->
+        <div
+          id="log-container"
+          class="mb-8 bg-white p-6 rounded-lg shadow-md hidden"
+        >
+          <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <span class="mr-2 text-blue-600">
+              <i data-lucide="terminal" class="w-5 h-5"></i>
+            </span>
+            Log de procesamiento
+          </h2>
+          <div
+            id="process-log"
+            class="bg-gray-900 text-green-400 p-4 rounded font-mono text-sm overflow-auto max-h-64"
+          >
+            <!-- Aquí se mostrará el log de procesamiento -->
+          </div>
+        </div>
+
+        <!-- Estadísticas y resultados -->
+        <div
+          id="stats-container"
+          class="mb-8 bg-white p-6 rounded-lg shadow-md hidden"
+        >
+          <!-- Será rellenado por JavaScript -->
+        </div>
+
+        <!-- Prueba de normalización -->
+        <div id="test-container" class="mb-8 bg-white p-6 rounded-lg shadow-md">
+          <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <span class="mr-2 text-blue-600">
+              <i data-lucide="microscope" class="w-5 h-5"></i>
+            </span>
+            Probar normalización
+          </h2>
+          <p class="mb-4 text-gray-600">
+            Pruebe el normalizador con un procesador específico para verificar
+            cómo lo interpreta:
+          </p>
+          <div class="flex flex-col space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="col-span-2">
+                <input
+                  type="text"
+                  id="test-processor"
+                  placeholder="Ej: Intel Core i5-9400 @ 3.10GHz"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <button
+                  id="test-button"
+                  class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                >
+                  Normalizar
+                </button>
+              </div>
+            </div>
+            <div
+              id="test-result"
+              class="p-4 border border-gray-200 rounded-lg bg-gray-50 hidden"
+            >
+              <!-- Será rellenado por JavaScript -->
+            </div>
+          </div>
+        </div>
+
+        <!-- DataTable con resultados -->
+        <div
+          id="results-container"
+          class="bg-white p-6 rounded-lg shadow-md hidden"
+        >
+          <!-- Será rellenado por JavaScript -->
+        </div>
+      </main>
+
+      <footer class="bg-gray-100 text-gray-600 py-4 border-t">
+        <div class="container mx-auto px-4 text-center text-sm">
+          <p>
+            Normalizador de Procesadores para Auditoría - Modelo de Validación
+            para el Parque Informático
+          </p>
+          <p class="mt-1">Versión depurada con corrección de errores</p>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      // Inicializar iconos de Lucide
+      lucide.createIcons();
+
+      // Sistema de log para depuración
+      const logger = {
+        container: document.getElementById("log-container"),
+        log: document.getElementById("process-log"),
+        add: function (message, type = "info") {
+          this.container.classList.remove("hidden");
+          const classes = {
+            info: "text-green-400",
+            warn: "text-yellow-400",
+            error: "text-red-400",
+            success: "text-cyan-400",
+          };
+          const timestamp = new Date().toLocaleTimeString();
+          const logEntry = document.createElement("div");
+          logEntry.className = classes[type] || classes.info;
+          logEntry.innerHTML = `[${timestamp}] ${message}`;
+          this.log.appendChild(logEntry);
+          this.log.scrollTop = this.log.scrollHeight;
+          console.log(`[${type.toUpperCase()}] ${message}`);
+        },
+        clear: function () {
+          this.log.innerHTML = "";
+          this.container.classList.add("hidden");
+        },
+      };
+
+      // Función mejorada para normalizar procesadores
+      function normalizeProcessor(processor) {
+        if (!processor || typeof processor !== "string") {
+          return {
+            original: processor || "",
+            brand: "Desconocido",
+            model: "Desconocido",
+            generation: null,
+            speed: null,
+            normalized: "Desconocido",
+            meetsRequirements: false,
+            reason: "Datos de procesador no válidos",
+          };
+        }
+
+        // Eliminar caracteres y palabras innecesarias
+        let cleaned = processor.replace(/\[.*?\]/g, "").trim();
+        let lowercased = cleaned.toLowerCase();
+
+        logger.add(`Procesando: "${cleaned}"`, "info");
+
+        // Variables para almacenar información extraída
+        let brand = null;
+        let model = null;
+        let generation = null;
+        let speed = null;
+        let modelNumber = null;
+
+        // Extraer marca - mejorado para ser más flexible
+        if (
+          lowercased.includes("intel") ||
+          lowercased.includes("i3-") ||
+          lowercased.includes("i5-") ||
+          lowercased.includes("i7-") ||
+          lowercased.includes("i9-") ||
+          lowercased.startsWith("i5 ") ||
+          lowercased.startsWith("i7 ") ||
+          lowercased.startsWith("i3 ") ||
+          lowercased.startsWith("i9 ")
+        ) {
+          brand = "Intel";
+        } else if (
+          lowercased.includes("amd") ||
+          lowercased.includes("ryzen") ||
+          lowercased.includes("athlon")
+        ) {
+          brand = "AMD";
+        } else if (lowercased.includes("pentium")) {
+          brand = "Intel"; // Pentium es de Intel
+        } else if (lowercased.includes("celeron")) {
+          brand = "Intel"; // Celeron es de Intel
+        } else {
+          brand = "Otro";
+        }
+
+        // Extraer modelo - mejorado para ser más flexible
+        if (brand === "Intel") {
+          // Patrones para Intel Core
+          if (
+            lowercased.includes("core i3") ||
+            lowercased.includes("i3-") ||
+            lowercased.match(/\bi3\b/) ||
+            lowercased.match(/\bi3 /)
+          ) {
+            model = "Core i3";
+
+            // Extraer número de modelo para i3
+            const modelMatch =
+              cleaned.match(/i3[- ](\d{4,5})/i) ||
+              cleaned.match(/i3[- ](\d{1,2}\.\d{3,4})/i) ||
+              cleaned.match(/i3 (\d{4,5})/i);
+            if (modelMatch) {
+              modelNumber = modelMatch[1].replace(".", "");
+              logger.add(`Detectado modelo i3: ${modelNumber}`, "info");
+            }
+          } else if (
+            lowercased.includes("core i5") ||
+            lowercased.includes("i5-") ||
+            lowercased.match(/\bi5\b/) ||
+            lowercased.match(/\bi5 /)
+          ) {
+            model = "Core i5";
+
+            // Extraer número de modelo para i5
+            const modelMatch =
+              cleaned.match(/i5[- ](\d{4,5}[a-z]*)/i) ||
+              cleaned.match(/i5[- ](\d{1,2}\.\d{3,4}[a-z]*)/i) ||
+              cleaned.match(/i5 (\d{4,5}[a-z]*)/i) ||
+              cleaned.match(/i5-(\d{4,5}[a-z]*)/i);
+            if (modelMatch) {
+              modelNumber = modelMatch[1].replace(".", "");
+              logger.add(`Detectado modelo i5: ${modelNumber}`, "info");
+            }
+          } else if (
+            lowercased.includes("core i7") ||
+            lowercased.includes("i7-") ||
+            lowercased.match(/\bi7\b/) ||
+            lowercased.match(/\bi7 /)
+          ) {
+            model = "Core i7";
+
+            // Extraer número de modelo para i7
+            const modelMatch =
+              cleaned.match(/i7[- ](\d{4,5}[a-z]*)/i) ||
+              cleaned.match(/i7[- ](\d{1,2}\.\d{3,4}[a-z]*)/i) ||
+              cleaned.match(/i7 (\d{4,5}[a-z]*)/i);
+            if (modelMatch) {
+              modelNumber = modelMatch[1].replace(".", "");
+              logger.add(`Detectado modelo i7: ${modelNumber}`, "info");
+            }
+          } else if (
+            lowercased.includes("core i9") ||
+            lowercased.includes("i9-") ||
+            lowercased.match(/\bi9\b/) ||
+            lowercased.match(/\bi9 /)
+          ) {
+            model = "Core i9";
+
+            // Extraer número de modelo para i9
+            const modelMatch =
+              cleaned.match(/i9[- ](\d{4,5}[a-z]*)/i) ||
+              cleaned.match(/i9[- ](\d{1,2}\.\d{3,4}[a-z]*)/i) ||
+              cleaned.match(/i9 (\d{4,5}[a-z]*)/i);
+            if (modelMatch) {
+              modelNumber = modelMatch[1].replace(".", "");
+              logger.add(`Detectado modelo i9: ${modelNumber}`, "info");
+            }
+          } else if (lowercased.includes("celeron")) {
+            model = "Celeron";
+
+            // Extraer número de modelo para Celeron
+            const modelMatch = cleaned.match(/celeron .*?(\d{4,5})/i);
+            if (modelMatch) {
+              modelNumber = modelMatch[1];
+              logger.add(`Detectado modelo Celeron: ${modelNumber}`, "info");
+            }
+          } else if (lowercased.includes("pentium")) {
+            model = "Pentium";
+
+            // Extraer número de modelo para Pentium
+            const modelMatch = cleaned.match(/pentium .*?(\d{4,5})/i);
+            if (modelMatch) {
+              modelNumber = modelMatch[1];
+              logger.add(`Detectado modelo Pentium: ${modelNumber}`, "info");
+            }
+          } else if (lowercased.includes("atom")) {
+            model = "Atom";
+          } else {
+            model = "Otro Intel";
+          }
+        } else if (brand === "AMD") {
+          if (lowercased.includes("ryzen 3")) {
+            model = "Ryzen 3";
+
+            // Intentar extraer modelo específico para Ryzen 3
+            const ryzenModelMatch = cleaned.match(/Ryzen 3 (\d{4})/i);
+            if (ryzenModelMatch) {
+              modelNumber = ryzenModelMatch[1];
+              logger.add(`Detectado modelo Ryzen 3: ${modelNumber}`, "info");
+            }
+          } else if (lowercased.includes("ryzen 5")) {
+            model = "Ryzen 5";
+
+            // Intentar extraer modelo específico para Ryzen 5
+            const ryzenModelMatch = cleaned.match(/Ryzen 5 (\d{4}[a-z]*)/i);
+            if (ryzenModelMatch) {
+              modelNumber = ryzenModelMatch[1];
+              logger.add(`Detectado modelo Ryzen 5: ${modelNumber}`, "info");
+            }
+          } else if (lowercased.includes("ryzen 7")) {
+            model = "Ryzen 7";
+
+            // Intentar extraer modelo específico para Ryzen 7
+            const ryzenModelMatch = cleaned.match(/Ryzen 7 (\d{4}[a-z]*)/i);
+            if (ryzenModelMatch) {
+              modelNumber = ryzenModelMatch[1];
+              logger.add(`Detectado modelo Ryzen 7: ${modelNumber}`, "info");
+            }
+          } else if (lowercased.includes("ryzen 9")) {
+            model = "Ryzen 9";
+          } else if (lowercased.includes("athlon")) {
+            model = "Athlon";
+          } else if (lowercased.includes("a4")) {
+            model = "A4";
+          } else if (lowercased.includes("a6")) {
+            model = "A6";
+          } else if (lowercased.includes("a8")) {
+            model = "A8";
+          } else if (lowercased.includes("a10")) {
+            model = "A10";
+          } else if (lowercased.includes("fx")) {
+            model = "FX";
+          } else if (lowercased.includes("ryzen")) {
+            model = "Ryzen (otro)";
+          } else {
+            model = "Otro AMD";
+          }
+        }
+
+        // Extraer generación basada en el número de modelo para Intel
+        if (brand === "Intel" && modelNumber) {
+          // Limpiar cualquier carácter no numérico del inicio
+          let numericPart = modelNumber.replace(/^[^\d]+/, "");
+
+          // Obtener solo los dígitos iniciales
+          const numericMatch = numericPart.match(/^\d+/);
+          if (numericMatch) {
+            numericPart = numericMatch[0];
+
+            // Primera cifra es la generación para Intel Core
+            const firstDigit = numericPart.charAt(0);
+            if (firstDigit && !isNaN(parseInt(firstDigit))) {
+              // Casos especiales para generaciones recientes de dos dígitos
+              if (numericPart.startsWith("13")) {
+                generation = "13th Gen";
+              } else if (numericPart.startsWith("12")) {
+                generation = "12th Gen";
+              } else if (numericPart.startsWith("11")) {
+                generation = "11th Gen";
+              } else if (numericPart.startsWith("10")) {
+                generation = "10th Gen";
+              } else {
+                generation = `${firstDigit}th Gen`;
+              }
+              logger.add(`Detectada generación: ${generation}`, "info");
+            }
+          }
+        }
+
+        // Buscar generación explícitamente mencionada (en caso de que no se detecte por el número de modelo)
+        if (brand === "Intel" && !generation) {
+          if (
+            lowercased.includes("13th gen") ||
+            lowercased.includes("13.0th gen") ||
+            lowercased.includes("13 gen") ||
+            lowercased.includes("gen 13")
+          ) {
+            generation = "13th Gen";
+          } else if (
+            lowercased.includes("12th gen") ||
+            lowercased.includes("12.0th gen") ||
+            lowercased.includes("12 gen") ||
+            lowercased.includes("gen 12")
+          ) {
+            generation = "12th Gen";
+          } else if (
+            lowercased.includes("11th gen") ||
+            lowercased.includes("11.0th gen") ||
+            lowercased.includes("11 gen") ||
+            lowercased.includes("gen 11")
+          ) {
+            generation = "11th Gen";
+          } else if (
+            lowercased.includes("10th gen") ||
+            lowercased.includes("10.0th gen") ||
+            lowercased.includes("10 gen") ||
+            lowercased.includes("gen 10")
+          ) {
+            generation = "10th Gen";
+          } else if (
+            lowercased.includes("9th gen") ||
+            lowercased.includes("9.0th gen") ||
+            lowercased.includes("9 gen") ||
+            lowercased.includes("gen 9")
+          ) {
+            generation = "9th Gen";
+          } else if (
+            lowercased.includes("8th gen") ||
+            lowercased.includes("8.0th gen") ||
+            lowercased.includes("8 gen") ||
+            lowercased.includes("gen 8") ||
+            lowercased.includes("8va gen")
+          ) {
+            generation = "8th Gen";
+          } else if (
+            lowercased.includes("7th gen") ||
+            lowercased.includes("7.0th gen") ||
+            lowercased.includes("7 gen") ||
+            lowercased.includes("gen 7")
+          ) {
+            generation = "7th Gen";
+          } else if (
+            lowercased.includes("6th gen") ||
+            lowercased.includes("6.0th gen") ||
+            lowercased.includes("6 gen") ||
+            lowercased.includes("gen 6")
+          ) {
+            generation = "6th Gen";
+          }
+
+          if (generation) {
+            logger.add(`Detectada generación del texto: ${generation}`, "info");
+          }
+        }
+
+        // Adivinar generación para ciertos modelos si no se detectó
+        if (
+          brand === "Intel" &&
+          model &&
+          model.startsWith("Core i") &&
+          !generation &&
+          modelNumber
+        ) {
+          // Asumimos que el primer dígito del número de modelo indica la generación
+          if (modelNumber.match(/^9\d{3}/)) {
+            generation = "9th Gen";
+          } else if (modelNumber.match(/^8\d{3}/)) {
+            generation = "8th Gen";
+          } else if (modelNumber.match(/^7\d{3}/)) {
+            generation = "7th Gen";
+          } else if (modelNumber.match(/^6\d{3}/)) {
+            generation = "6th Gen";
+          } else if (modelNumber.match(/^5\d{3}/)) {
+            generation = "5th Gen";
+          } else if (modelNumber.match(/^4\d{3}/)) {
+            generation = "4th Gen";
+          } else if (modelNumber.match(/^3\d{3}/)) {
+            generation = "3th Gen";
+          } else if (modelNumber.match(/^13\d{3}/)) {
+            generation = "13th Gen";
+          } else if (modelNumber.match(/^12\d{3}/)) {
+            generation = "12th Gen";
+          } else if (modelNumber.match(/^11\d{3}/)) {
+            generation = "11th Gen";
+          } else if (modelNumber.match(/^10\d{3}/)) {
+            generation = "10th Gen";
+          }
+
+          if (generation) {
+            logger.add(
+              `Generación inferida del número de modelo: ${generation}`,
+              "info"
+            );
+          }
+        }
+
+        // Extracción mejorada de velocidad
+        // 1. Buscar patrones como "@ 3.10GHz"
+        const speedRegex1 = /@\s*(\d+[\.,]\d+)\s*(?:ghz|gh|mhz|g)/i;
+        const speedMatch1 = cleaned.match(speedRegex1);
+        if (speedMatch1) {
+          speed = parseFloat(speedMatch1[1].replace(",", ".")) + " GHz";
+          logger.add(`Detectada velocidad (patrón 1): ${speed}`, "info");
+        }
+
+        // 2. Si no, buscar patrones como "3.50GHz"
+        if (!speed) {
+          const speedRegex2 = /(\d+[\.,]\d+)\s*(?:ghz|gh|mhz|g)/i;
+          const speedMatch2 = cleaned.match(speedRegex2);
+          if (speedMatch2) {
+            speed = parseFloat(speedMatch2[1].replace(",", ".")) + " GHz";
+            logger.add(`Detectada velocidad (patrón 2): ${speed}`, "info");
+          }
+        }
+
+        // 3. Si aún no hay velocidad, buscar cualquier número decimal que podría ser GHz
+        if (!speed) {
+          const numericRegex = /\b(\d+[\.,]\d+)\b/g;
+          const numericMatches = [...cleaned.matchAll(numericRegex)];
+
+          // Filtrar para eliminar números que probablemente no sean velocidades
+          const possibleSpeeds = numericMatches
+            .map((m) => parseFloat(m[1].replace(",", ".")))
+            .filter((n) => n >= 1.0 && n <= 5.5); // Rango típico de velocidades de CPU
+
+          if (possibleSpeeds.length > 0) {
+            // Tomar el valor más alto como la velocidad probable
+            speed = Math.max(...possibleSpeeds) + " GHz";
+            logger.add(`Detectada velocidad (números): ${speed}`, "info");
+          }
+        }
+
+        // Construir cadena normalizada
+        let normalized = `${brand} ${model}`;
+        if (modelNumber) {
+          normalized += ` ${modelNumber}`;
+        }
+        if (generation) {
+          normalized += ` ${generation}`;
+        }
+        if (speed) {
+          normalized += ` @ ${speed}`;
+        }
+
+        // Verificar si cumple con los requisitos
+        let meetsRequirements = false;
+        let reason = "";
+
+        // Extraer velocidad numérica para comparación
+        let speedValue = speed ? parseFloat(speed) : 0;
+
+        // Verificar Intel Core i5
+        if (brand === "Intel" && model === "Core i5") {
+          let genNumber = 0;
+
+          if (generation) {
+            const genMatch = generation.match(/(\d+)/);
+            if (genMatch) {
+              genNumber = parseInt(genMatch[1]);
+            }
+          }
+
+          if (genNumber >= 8) {
+            if (speedValue >= 3.0) {
+              meetsRequirements = true;
+              logger.add(
+                `CUMPLE REQUISITOS: Intel Core i5 gen ${genNumber} @ ${speedValue} GHz`,
+                "success"
+              );
+            } else {
+              reason = `Velocidad insuficiente: ${speedValue} GHz (requiere 3.0 GHz o superior)`;
+              logger.add(`NO CUMPLE: ${reason}`, "warn");
+            }
+          } else {
+            reason = `Generación insuficiente: ${
+              generation || "Desconocida"
+            } (requiere 8va gen o superior)`;
+            logger.add(`NO CUMPLE: ${reason}`, "warn");
+          }
+        }
+        // Verificar AMD Ryzen 5
+        else if (brand === "AMD" && model === "Ryzen 5") {
+          if (speedValue >= 3.7) {
+            meetsRequirements = true;
+            logger.add(
+              `CUMPLE REQUISITOS: AMD Ryzen 5 @ ${speedValue} GHz`,
+              "success"
+            );
+          } else {
+            reason = `Velocidad insuficiente: ${speedValue} GHz (requiere 3.7 GHz o superior)`;
+            logger.add(`NO CUMPLE: ${reason}`, "warn");
+          }
+        } else {
+          reason = `No cumple requisitos de marca/modelo: ${brand} ${model}`;
+          logger.add(`NO CUMPLE: ${reason}`, "warn");
+        }
+
+        return {
+          original: processor,
+          brand,
+          model,
+          modelNumber,
+          generation,
+          speed,
+          speedValue,
+          normalized,
+          meetsRequirements,
+          reason,
+        };
+      }
+
+      // Procesar archivo Excel
+      async function processExcelFile(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.onload = function (e) {
+            try {
+              logger.add(`Archivo cargado: ${file.name}`, "info");
+              logger.add(`Tamaño: ${Math.round(file.size / 1024)} KB`, "info");
+
+              // Leer el archivo Excel
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, {
+                type: "array",
+                cellStyles: true,
+                cellFormulas: true,
+                cellDates: true,
+                cellNF: true,
+                sheetStubs: true,
+              });
+
+              // Obtener primera hoja
+              const sheetName = workbook.SheetNames[0];
+              const firstSheet = workbook.Sheets[sheetName];
+
+              logger.add(`Hoja encontrada: ${sheetName}`, "info");
+
+              // Convertir a JSON
+              const jsonData = XLSX.utils.sheet_to_json(firstSheet, {
+                raw: false,
+              });
+              logger.add(`Filas detectadas: ${jsonData.length}`, "info");
+
+              if (jsonData.length === 0) {
+                throw new Error(
+                  "El archivo no contiene datos o el formato no es compatible"
+                );
+              }
+
+              // Intentar encontrar la columna del procesador
+              const sampleRow = jsonData[0];
+              logger.add(`Buscando columna de procesadores...`, "info");
+              logger.add(
+                `Columnas disponibles: ${Object.keys(sampleRow).join(", ")}`,
+                "info"
+              );
+
+              const processorColumns = Object.keys(sampleRow).filter(
+                (key) =>
+                  key &&
+                  typeof key === "string" &&
+                  key.toLowerCase().includes("procesador") &&
+                  !key.toLowerCase().includes("normalizado") &&
+                  !key.toLowerCase().includes("marca") &&
+                  !key.toLowerCase().includes("modelo")
+              );
+
+              if (processorColumns.length === 0) {
+                throw new Error(
+                  "No se encontró una columna de procesadores en el archivo"
+                );
+              }
+
+              const processorKey = processorColumns[0];
+              logger.add(
+                `Usando columna de procesadores: "${processorKey}"`,
+                "success"
+              );
+
+              // Normalizar los procesadores
+              logger.add(
+                `Comenzando normalización de ${jsonData.length} procesadores...`,
+                "info"
+              );
+              const normalizedData = [];
+              let processedCount = 0;
+              let successCount = 0;
+
+              for (const row of jsonData) {
+                try {
+                  processedCount++;
+                  if (processedCount % 100 === 0) {
+                    logger.add(`Procesando fila ${processedCount}...`, "info");
+                  }
+
+                  if (processorKey in row && row[processorKey]) {
+                    const processorValue = row[processorKey];
+                    const normalizedProcessor =
+                      normalizeProcessor(processorValue);
+
+                    // Añadir columnas con información normalizada
+                    const newRow = {
+                      ...row,
+                      "Procesador Normalizado": normalizedProcessor.normalized,
+                      "Marca Procesador": normalizedProcessor.brand,
+                      "Modelo Procesador": normalizedProcessor.model,
+                      Generación: normalizedProcessor.generation || "N/A",
+                      Velocidad: normalizedProcessor.speed || "N/A",
+                      "Cumple Requisitos": normalizedProcessor.meetsRequirements
+                        ? "Sí"
+                        : "No",
+                      "Motivo Incumplimiento":
+                        normalizedProcessor.meetsRequirements
+                          ? ""
+                          : normalizedProcessor.reason,
+                    };
+
+                    normalizedData.push(newRow);
+                    successCount++;
+                  } else {
+                    // Si falta el procesador, mantener la fila pero marcarla
+                    const newRow = {
+                      ...row,
+                      "Procesador Normalizado": "Sin datos",
+                      "Marca Procesador": "Desconocido",
+                      "Modelo Procesador": "Desconocido",
+                      Generación: "N/A",
+                      Velocidad: "N/A",
+                      "Cumple Requisitos": "No",
+                      "Motivo Incumplimiento":
+                        "No se encontraron datos de procesador",
+                    };
+                    normalizedData.push(newRow);
+                  }
+                } catch (rowError) {
+                  logger.add(
+                    `Error procesando fila ${processedCount}: ${rowError.message}`,
+                    "error"
+                  );
+                  // Si hay error en la fila, incluirla igual con un mensaje de error
+                  const newRow = {
+                    ...row,
+                    "Procesador Normalizado": "Error de procesamiento",
+                    "Marca Procesador": "Error",
+                    "Modelo Procesador": "Error",
+                    Generación: "N/A",
+                    Velocidad: "N/A",
+                    "Cumple Requisitos": "No",
+                    "Motivo Incumplimiento": `Error: ${rowError.message}`,
+                  };
+                  normalizedData.push(newRow);
+                }
+              }
+
+              logger.add(
+                `Normalización completa. ${successCount} filas procesadas correctamente.`,
+                "success"
+              );
+
+              // Generar estadísticas
+              const totalRows = normalizedData.length;
+              const meetingReqs = normalizedData.filter(
+                (row) => row["Cumple Requisitos"] === "Sí"
+              ).length;
+              const notMeetingReqs = normalizedData.filter(
+                (row) => row["Cumple Requisitos"] === "No"
+              ).length;
+
+              logger.add(
+                `Cumplen requisitos: ${meetingReqs} (${(
+                  (meetingReqs / totalRows) *
+                  100
+                ).toFixed(2)}%)`,
+                "info"
+              );
+              logger.add(
+                `No cumplen requisitos: ${notMeetingReqs} (${(
+                  (notMeetingReqs / totalRows) *
+                  100
+                ).toFixed(2)}%)`,
+                "info"
+              );
+
+              // Contar por marca
+              const brandCount = {};
+              normalizedData.forEach((row) => {
+                const brand = row["Marca Procesador"];
+                if (brand) {
+                  brandCount[brand] = (brandCount[brand] || 0) + 1;
+                }
+              });
+
+              logger.add(
+                `Distribución por marca: ${JSON.stringify(brandCount)}`,
+                "info"
+              );
+
+              // Contar por modelo
+              const modelCount = {};
+              normalizedData.forEach((row) => {
+                const model = row["Modelo Procesador"];
+                if (model) {
+                  modelCount[model] = (modelCount[model] || 0) + 1;
+                }
+              });
+
+              logger.add(
+                `Distribución por modelo: ${JSON.stringify(modelCount)}`,
+                "info"
+              );
+
+              // Contar por motivo de incumplimiento
+              const failureReasons = {};
+              normalizedData.forEach((row) => {
+                const reason = row["Motivo Incumplimiento"];
+                if (reason) {
+                  failureReasons[reason] = (failureReasons[reason] || 0) + 1;
+                }
+              });
+
+              const topReasons = Object.entries(failureReasons)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+              logger.add(
+                `Principales motivos de incumplimiento: ${JSON.stringify(
+                  topReasons
+                )}`,
+                "info"
+              );
+
+              // Preparar estadísticas
+              const stats = {
+                totalProcessors: totalRows,
+                meetingRequirements: meetingReqs,
+                notMeetingRequirements: notMeetingReqs,
+                complianceRate: (meetingReqs / totalRows) * 100,
+                brandDistribution: brandCount,
+                modelDistribution: modelCount,
+                failureReasons: failureReasons,
+              };
+
+              logger.add(`Preparando datos para exportación...`, "info");
+
+              resolve({ normalizedData, stats });
+            } catch (error) {
+              logger.add(`ERROR CRÍTICO: ${error.message}`, "error");
+              reject("Error al procesar el archivo Excel: " + error.message);
+            }
+          };
+
+          reader.onerror = function () {
+            logger.add(`Error al leer el archivo: ${file.name}`, "error");
+            reject("Error al leer el archivo");
+          };
+
+          reader.readAsArrayBuffer(file);
+        });
+      }
+
+      // Variables globales
+      let normalizedData = null;
+      let stats = null;
+      let activeTab = "todos";
+      let searchTerm = "";
+      let sortConfig = { key: null, direction: "ascending" };
+
+      // Mostrar estadísticas
+      function renderStats(stats) {
+        const statsContainer = document.getElementById("stats-container");
+        statsContainer.classList.remove("hidden");
+
+        // Ordenar motivos de incumplimiento
+        const sortedReasons = Object.entries(stats.failureReasons)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+
+        // Crear HTML para estadísticas
+        statsContainer.innerHTML = `
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <span class="mr-2 text-blue-600">
+                        <i data-lucide="info" class="w-5 h-5"></i>
+                    </span>
+                    Resumen del análisis
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <p class="text-sm text-blue-700 mb-1">Total de equipos</p>
+                        <p class="text-2xl font-bold">${
+                          stats.totalProcessors
+                        }</p>
+                    </div>
+
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <p class="text-sm text-green-700 mb-1">Cumplen requisitos</p>
+                        <p class="text-2xl font-bold">
+                            ${stats.meetingRequirements}
+                            <span class="text-sm font-normal ml-2">
+                                (${stats.complianceRate.toFixed(2)}%)
+                            </span>
+                        </p>
+                    </div>
+
+                    <div class="bg-red-50 p-4 rounded-lg">
+                        <p class="text-sm text-red-700 mb-1">No cumplen requisitos</p>
+                        <p class="text-2xl font-bold">
+                            ${stats.notMeetingRequirements}
+                            <span class="text-sm font-normal ml-2">
+                                (${(100 - stats.complianceRate).toFixed(2)}%)
+                            </span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-lg font-medium mb-2">Distribución por marca</h3>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            ${Object.entries(stats.brandDistribution)
+                              .map(
+                                ([brand, count]) => `
+                                <div class="flex justify-between py-1 border-b border-gray-200 last:border-0">
+                                    <span class="font-medium">${brand}</span>
+                                    <span>
+                                        ${count} (${(
+                                  (count / stats.totalProcessors) *
+                                  100
+                                ).toFixed(1)}%)
+                                    </span>
+                                </div>
+                            `
+                              )
+                              .join("")}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-medium mb-2">Principales motivos de incumplimiento</h3>
+                        <div class="bg-gray-50 p-4 rounded-lg max-h-60 overflow-y-auto">
+                            ${sortedReasons
+                              .map(
+                                ([reason, count]) => `
+                                <div class="flex justify-between py-1 border-b border-gray-200 last:border-0">
+                                    <span class="text-sm">${reason}</span>
+                                    <span class="text-sm font-medium">
+                                        ${count} (${(
+                                  (count / stats.notMeetingRequirements) *
+                                  100
+                                ).toFixed(1)}%)
+                                    </span>
+                                </div>
+                            `
+                              )
+                              .join("")}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button
+                        id="download-excel"
+                        class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+                    >
+                        <i data-lucide="file-down" class="mr-2 w-5 h-5"></i>
+                        Descargar Excel Normalizado
+                    </button>
+                </div>
+            `;
+
+        // Re-inicializar iconos para los nuevos elementos
+        lucide.createIcons();
+
+        // Agregar evento al botón de descarga
+        document
+          .getElementById("download-excel")
+          .addEventListener("click", downloadNormalizedExcel);
+      }
+
+      // Mostrar tabla de resultados
+      function renderResults() {
+        if (!normalizedData) return;
+
+        const resultsContainer = document.getElementById("results-container");
+        resultsContainer.classList.remove("hidden");
+
+        // Obtener columnas para la tabla
+        const columns = getTableColumns();
+
+        // Filtrar datos según tab activo y término de búsqueda
+        const filteredData = getFilteredSortedData();
+
+        // Crear HTML para la tabla
+        resultsContainer.innerHTML = `
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <span class="mr-2 text-blue-600">
+                        <i data-lucide="table" class="w-5 h-5"></i>
+                    </span>
+                    Datos normalizados
+                </h2>
+
+                <div class="flex flex-col sm:flex-row gap-4 justify-between mb-4">
+                    <div class="flex">
+                        <button
+                            id="tab-todos"
+                            class="px-4 py-2 rounded-l-lg border ${
+                              activeTab === "todos"
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                            }"
+                        >
+                            Todos
+                        </button>
+                        <button
+                            id="tab-cumple"
+                            class="px-4 py-2 border-t border-b ${
+                              activeTab === "cumple"
+                                ? "bg-green-600 text-white border-green-600"
+                                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                            }"
+                        >
+                            <span class="flex items-center">
+                                <i data-lucide="check" class="mr-1 w-4 h-4"></i>
+                                Cumplen
+                            </span>
+                        </button>
+                        <button
+                            id="tab-noCumple"
+                            class="px-4 py-2 rounded-r-lg border ${
+                              activeTab === "noCumple"
+                                ? "bg-red-600 text-white border-red-600"
+                                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                            }"
+                        >
+                            <span class="flex items-center">
+                                <i data-lucide="alert-circle" class="mr-1 w-4 h-4"></i>
+                                No cumplen
+                            </span>
+                        </button>
+                    </div>
+
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="search-input"
+                            placeholder="Buscar..."
+                            class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value="${searchTerm}"
+                        />
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                ${columns
+                                  .map(
+                                    (column) => `
+                                    <th data-column="${column}"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                    >
+                                        <div class="flex items-center">
+                                            ${column}
+                                            ${
+                                              sortConfig.key === column
+                                                ? `<span class="ml-1">${
+                                                    sortConfig.direction ===
+                                                    "ascending"
+                                                      ? "↑"
+                                                      : "↓"
+                                                  }</span>`
+                                                : ""
+                                            }
+                                        </div>
+                                    </th>
+                                `
+                                  )
+                                  .join("")}
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${filteredData
+                              .slice(0, 100)
+                              .map(
+                                (row, rowIndex) => `
+                                <tr class="${
+                                  row["Cumple Requisitos"] === "Sí"
+                                    ? "hover:bg-green-50"
+                                    : "hover:bg-red-50"
+                                }">
+                                    ${columns
+                                      .map(
+                                        (column) => `
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm ${
+                                          column === "Cumple Requisitos"
+                                            ? row[column] === "Sí"
+                                              ? "text-green-600 font-medium"
+                                              : "text-red-600 font-medium"
+                                            : "text-gray-800"
+                                        }">
+                                            ${row[column] || ""}
+                                        </td>
+                                    `
+                                      )
+                                      .join("")}
+                                </tr>
+                            `
+                              )
+                              .join("")}
+                        </tbody>
+                    </table>
+
+                    <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-gray-700">
+                                Mostrando primeras 100 filas de ${
+                                  filteredData.length
+                                } resultados
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        // Re-inicializar iconos para los nuevos elementos
+        lucide.createIcons();
+
+        // Agregar eventos a los botones de pestaña
+        document.getElementById("tab-todos").addEventListener("click", () => {
+          activeTab = "todos";
+          renderResults();
+        });
+
+        document.getElementById("tab-cumple").addEventListener("click", () => {
+          activeTab = "cumple";
+          renderResults();
+        });
+
+        document
+          .getElementById("tab-noCumple")
+          .addEventListener("click", () => {
+            activeTab = "noCumple";
+            renderResults();
+          });
+
+        // Agregar evento al campo de búsqueda
+        document
+          .getElementById("search-input")
+          .addEventListener("input", (e) => {
+            searchTerm = e.target.value;
+            renderResults();
+          });
+
+        // Agregar eventos para ordenar columnas
+        document.querySelectorAll("th[data-column]").forEach((th) => {
+          th.addEventListener("click", () => {
+            const column = th.getAttribute("data-column");
+            requestSort(column);
+            renderResults();
+          });
+        });
+      }
+
+      // Obtener columnas para la tabla
+      function getTableColumns() {
+        if (!normalizedData || normalizedData.length === 0) return [];
+
+        // Columnas clave que queremos mostrar en este orden
+        const keyColumns = [
+          "Hostname",
+          "Procesador (marca, modelo y velocidad)",
+          "Procesador Normalizado",
+          "Marca Procesador",
+          "Modelo Procesador",
+          "Generación",
+          "Velocidad",
+          "Cumple Requisitos",
+          "Motivo Incumplimiento",
+        ];
+
+        // Filtrar columnas que existen en los datos
+        return keyColumns.filter((col) =>
+          normalizedData[0].hasOwnProperty(col)
+        );
+      }
+
+      // Ordenar datos
+      function requestSort(key) {
+        let direction = "ascending";
+        if (sortConfig.key === key && sortConfig.direction === "ascending") {
+          direction = "descending";
+        }
+        sortConfig = { key, direction };
+      }
+
+      // Obtener datos filtrados y ordenados
+      function getFilteredSortedData() {
+        if (!normalizedData) return [];
+
+        // Filtrar por pestaña activa
+        let filteredData = normalizedData;
+        if (activeTab === "cumple") {
+          filteredData = normalizedData.filter(
+            (row) => row["Cumple Requisitos"] === "Sí"
+          );
+        } else if (activeTab === "noCumple") {
+          filteredData = normalizedData.filter(
+            (row) => row["Cumple Requisitos"] === "No"
+          );
+        }
+
+        // Filtrar por término de búsqueda
+        if (searchTerm) {
+          filteredData = filteredData.filter((row) => {
+            return Object.values(row).some(
+              (value) =>
+                value &&
+                typeof value === "string" &&
+                value.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+          });
+        }
+
+        // Ordenar datos
+        if (sortConfig.key) {
+          filteredData.sort((a, b) => {
+            if (a[sortConfig.key] < b[sortConfig.key]) {
+              return sortConfig.direction === "ascending" ? -1 : 1;
+            }
+            if (a[sortConfig.key] > b[sortConfig.key]) {
+              return sortConfig.direction === "ascending" ? 1 : -1;
+            }
+            return 0;
+          });
+        }
+
+        return filteredData;
+      }
+
+      // Descargar Excel normalizado
+      function downloadNormalizedExcel() {
+        if (!normalizedData || !stats) return;
+
+        logger.add(`Preparando archivo Excel para descarga...`, "info");
+
+        try {
+          // Crear hoja con datos normalizados
+          const worksheet = XLSX.utils.json_to_sheet(normalizedData);
+
+          // Aplicar formato a la hoja
+          const range = XLSX.utils.decode_range(worksheet["!ref"]);
+
+          // Agregar estilos (colores) - No soportado directamente en SheetJS free
+          // Pero podemos prepararlo para mejor visualización
+
+          // Crear libro nuevo
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(
+            workbook,
+            worksheet,
+            "Datos Normalizados"
+          );
+
+          // Guardar archivo
+          logger.add(`Descargando archivo Excel...`, "success");
+          XLSX.writeFile(workbook, "Procesadores_Normalizados_Mejorado.xlsx");
+        } catch (error) {
+          logger.add(`Error al generar Excel: ${error.message}`, "error");
+          showError("Error al generar el archivo Excel: " + error.message);
+        }
+      }
+
+      // Mostrar errores
+      function showError(message) {
+        const errorContainer = document.getElementById("error-message");
+        const errorText = document.getElementById("error-text");
+
+        errorText.textContent = message;
+        errorContainer.classList.remove("hidden");
+
+        logger.add(`ERROR: ${message}`, "error");
+      }
+
+      // Mostrar resultado de prueba de normalización
+      function showTestResult(processor) {
+        const testResult = document.getElementById("test-result");
+
+        logger.clear(); // Limpiar log anterior
+        logger.add(`Probando procesador: "${processor}"`, "info");
+
+        const result = normalizeProcessor(processor);
+
+        testResult.classList.remove("hidden");
+        testResult.innerHTML = `
+                <div class="mb-3">
+                    <p class="text-sm text-gray-500 mb-1">Procesador original:</p>
+                    <p class="font-medium">${result.original}</p>
+                </div>
+                <div class="mb-3">
+                    <p class="text-sm text-gray-500 mb-1">Normalizado:</p>
+                    <p class="font-medium">${result.normalized}</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <p class="text-sm text-gray-500 mb-1">Marca:</p>
+                        <p>${result.brand}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 mb-1">Modelo:</p>
+                        <p>${result.model}${
+          result.modelNumber ? ` ${result.modelNumber}` : ""
+        }</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 mb-1">Generación:</p>
+                        <p>${result.generation || "No detectada"}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 mb-1">Velocidad:</p>
+                        <p>${result.speed || "No detectada"}</p>
+                    </div>
+                </div>
+                <div class="pt-3 border-t border-gray-200">
+                    <p class="text-sm text-gray-500 mb-1">¿Cumple los requisitos?</p>
+                    <p class="${
+                      result.meetsRequirements
+                        ? "text-green-600 font-medium"
+                        : "text-red-600 font-medium"
+                    }">
+                        ${result.meetsRequirements ? "✓ Sí" : "✗ No"}
+                        ${
+                          !result.meetsRequirements ? ` - ${result.reason}` : ""
+                        }
+                    </p>
+                </div>
+            `;
+      }
+
+      // Inicializar eventos
+      document.addEventListener("DOMContentLoaded", function () {
+        // Inicializar iconos
+        lucide.createIcons();
+
+        // Evento para subir archivo
+        document
+          .getElementById("file-upload")
+          .addEventListener("change", async function (event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Limpiar logs anteriores
+            logger.clear();
+            logger.add(`Archivo seleccionado: ${file.name}`, "info");
+
+            // Verificar extensión
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+              showError("Por favor suba un archivo Excel (.xlsx o .xls)");
+              return;
+            }
+
+            // Mostrar nombre de archivo
+            document.getElementById("file-name").textContent = file.name;
+
+            // Ocultar mensaje de error si existía
+            document.getElementById("error-message").classList.add("hidden");
+
+            // Mostrar estado de carga
+            const uploadArea = document.getElementById("upload-area");
+            uploadArea.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <i data-lucide="loader-2" class="w-10 h-10 text-blue-500 animate-spin mb-2"></i>
+                        <p class="text-gray-700">Procesando archivo...</p>
+                    </div>
+                `;
+
+            // Re-inicializar iconos para los nuevos elementos
+            lucide.createIcons();
+
+            try {
+              // Procesar archivo
+              const result = await processExcelFile(file);
+              normalizedData = result.normalizedData;
+              stats = result.stats;
+
+              // Restaurar área de carga
+              uploadArea.innerHTML = `
+                        <div class="mb-4 bg-blue-100 p-3 rounded-full text-blue-600">
+                            <i data-lucide="check" class="w-6 h-6"></i>
+                        </div>
+                        <p class="font-medium text-gray-700 mb-1">
+                            ${file.name}
+                        </p>
+                        <p class="text-sm text-green-600">
+                            Archivo procesado correctamente
+                        </p>
+                    `;
+
+              // Re-inicializar iconos para los nuevos elementos
+              lucide.createIcons();
+
+              // Mostrar resultados
+              renderStats(stats);
+              renderResults();
+            } catch (error) {
+              // Restaurar área de carga
+              uploadArea.innerHTML = `
+                        <div class="mb-4 bg-blue-100 p-3 rounded-full text-blue-600">
+                            <i data-lucide="upload" class="w-6 h-6"></i>
+                        </div>
+                        <p class="font-medium text-gray-700 mb-1">
+                            Haga clic para seleccionar un archivo
+                        </p>
+                        <p class="text-sm text-gray-500">
+                            Formatos soportados: .xlsx, .xls
+                        </p>
+                    `;
+
+              // Re-inicializar iconos para los nuevos elementos
+              lucide.createIcons();
+
+              // Mostrar error
+              showError(error);
+            }
+          });
+
+        // Evento para la prueba de normalización
+        document
+          .getElementById("test-button")
+          .addEventListener("click", function () {
+            const processorInput = document.getElementById("test-processor");
+            const processor = processorInput.value.trim();
+
+            if (!processor) {
+              alert("Por favor ingrese un procesador para probar");
+              return;
+            }
+
+            showTestResult(processor);
+          });
+
+        // Escuchar por Enter en el campo de texto de prueba
+        document
+          .getElementById("test-processor")
+          .addEventListener("keypress", function (e) {
+            if (e.key === "Enter") {
+              document.getElementById("test-button").click();
+            }
+          });
+
+        // Cargar ejemplos de prueba
+        const examples = [
+          "Intel Core i7-13.055U",
+          "I5-9400 @ 3.10GHZ",
+          "intel core i5-9500U 3.50GHz",
+        ];
+
+        // Poner un ejemplo en el campo de prueba
+        document.getElementById("test-processor").value =
+          examples[Math.floor(Math.random() * examples.length)];
+
+        logger.add(
+          "Aplicación de normalización de procesadores inicializada",
+          "success"
+        );
+        logger.add("Versión: 1.1.0 (Depurada)", "info");
+      });
+    </script>
+  </body>
+</html>
