@@ -1,7 +1,10 @@
 // App.js
 import React, { useState, useEffect, useContext } from "react";
 import { ThemeContext, ThemeProvider } from "./context/ThemeContext";
-import { ValidationRulesProvider } from "./context/ValidationRulesContext";
+import {
+  ValidationRulesContext,
+  ValidationRulesProvider,
+} from "./context/ValidationRulesContext";
 import { processExcelFile } from "./utils/excelProcessor";
 import * as XLSX from "xlsx";
 
@@ -18,6 +21,7 @@ import SavedAnalyses from "./components/SavedAnalyses";
 
 function AppContent() {
   const { isDarkMode } = useContext(ThemeContext);
+  const { rules } = useContext(ValidationRulesContext);
   const [file, setFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -31,6 +35,47 @@ function AppContent() {
     key: null,
     direction: "ascending",
   });
+
+  // Efecto para revalidar los datos cuando cambien las reglas
+  useEffect(() => {
+    // Solo ejecutar si ya hay datos normalizados
+    if (normalizedData && file && !isProcessing) {
+      // Re-procesar los datos con las nuevas reglas
+      setIsProcessing(true);
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const { normalizedData, stats } = await processExcelFile(
+            e.target.result,
+            rules
+          );
+          setNormalizedData(normalizedData);
+          setStats(stats);
+        } catch (error) {
+          console.error("Error al reprocesar archivo:", error);
+          setError(`Error al reprocesar el archivo: ${error.message}`);
+        } finally {
+          setIsProcessing(false);
+        }
+      };
+
+      reader.onerror = () => {
+        setError("Error al leer el archivo para reprocesar.");
+        setIsProcessing(false);
+      };
+
+      if (file instanceof File) {
+        reader.readAsArrayBuffer(file);
+      } else if (file.buffer) {
+        // Para casos de demostración donde puede no ser un File sino un objeto con buffer
+        reader.readAsArrayBuffer(file.buffer);
+      } else {
+        // Intentar recargar los datos de demostración
+        loadDemoData();
+      }
+    }
+  }, [rules]); // Añadir rules como dependencia
 
   // Datos de demostración para pruebas
   const loadDemoData = async () => {
@@ -65,17 +110,42 @@ function AppContent() {
         "AMD Ryzen 7 2700X Eight-Core Processor",
       ];
 
+      // Generar datos de memoria RAM
+      const ramOptions = [
+        "8 GB DDR4",
+        "16 GB DDR4",
+        "32 GB DDR4",
+        "4 GB DDR3",
+        "12 GB DDR4",
+        "64 GB DDR4",
+      ];
+
+      // Generar datos de almacenamiento
+      const storageOptions = [
+        "256 GB SSD",
+        "512 GB SSD",
+        "1 TB HDD",
+        "2 TB HDD",
+        "120 GB SSD",
+        "480 GB SSD",
+        "1 TB SSD",
+      ];
+
       // Generar 50 registros con nombres de host aleatorios
       for (let i = 1; i <= 50; i++) {
         const hostname = `host-${Math.floor(Math.random() * 1000) + 1}`;
         const processorIndex = Math.floor(
           Math.random() * demoProcessors.length
         );
+        const ramIndex = Math.floor(Math.random() * ramOptions.length);
+        const storageIndex = Math.floor(Math.random() * storageOptions.length);
 
         demoData.push({
           Hostname: hostname,
           "Procesador (marca, modelo y velocidad)":
             demoProcessors[processorIndex],
+          RAM: ramOptions[ramIndex],
+          Almacenamiento: storageOptions[storageIndex],
         });
       }
 
@@ -91,11 +161,14 @@ function AppContent() {
       });
 
       // Procesar los datos como si fuera un archivo real
-      const { normalizedData, stats } = await processExcelFile(excelBuffer);
+      const { normalizedData, stats } = await processExcelFile(
+        excelBuffer,
+        rules
+      );
 
       setNormalizedData(normalizedData);
       setStats(stats);
-      setFile({ name: "datos_demo.xlsx" });
+      setFile({ name: "datos_demo.xlsx", buffer: excelBuffer });
     } catch (error) {
       console.error("Error al cargar datos de demostración:", error);
       setError(`Error al cargar datos de demostración: ${error.message}`);
@@ -118,7 +191,8 @@ function AppContent() {
       reader.onload = async (e) => {
         try {
           const { normalizedData, stats } = await processExcelFile(
-            e.target.result
+            e.target.result,
+            rules
           );
           setNormalizedData(normalizedData);
           setStats(stats);
@@ -185,13 +259,13 @@ function AppContent() {
             }`}
           >
             <h1 className="text-2xl font-bold mb-4">
-              Bienvenido al Normalizador de Procesadores
+              Bienvenido al Normalizador de Hardware
             </h1>
             <p className="mb-6">
               Esta herramienta le permite analizar y normalizar información de
-              procesadores a partir de archivos Excel, facilitando auditorías de
-              hardware y comprobando si los procesadores cumplen con los
-              requisitos mínimos configurados.
+              procesadores, memoria RAM y almacenamiento a partir de archivos
+              Excel, facilitando auditorías de hardware y comprobando si los
+              componentes cumplen con los requisitos mínimos configurados.
             </p>
             <div className="max-w-3xl mx-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -208,8 +282,8 @@ function AppContent() {
                       isDarkMode ? "text-dark-text-secondary" : "text-gray-600"
                     }`}
                   >
-                    Suba un archivo Excel que contenga una columna con
-                    información de procesadores.
+                    Suba un archivo Excel que contenga columnas con información
+                    de procesadores, RAM y almacenamiento.
                   </p>
                 </div>
                 <div
@@ -226,7 +300,7 @@ function AppContent() {
                     }`}
                   >
                     La herramienta normalizará la información y verificará si
-                    los procesadores cumplen con los requisitos configurados.
+                    los componentes cumplen con los requisitos configurados.
                   </p>
                 </div>
                 <div

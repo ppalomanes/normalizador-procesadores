@@ -320,6 +320,170 @@ const StatsCharts = ({ stats, normalizedData }) => {
       <div className="mt-8">
         <SpeedDistributionChart normalizedData={normalizedData} />
       </div>
+
+      {/* Gráfico de distribución de RAM */}
+      {stats.ram && stats.ram.total > 0 && (
+        <div
+          className={`mt-8 ${
+            isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
+          } p-4 rounded-lg`}
+        >
+          <h3 className="text-lg font-medium mb-4 text-center">
+            Distribución por capacidad de RAM
+          </h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart
+              data={Object.entries(stats.ram.distribution)
+                .map(([size, count]) => ({
+                  name: `${size} GB`,
+                  value: count,
+                }))
+                .sort((a, b) => parseFloat(a.name) - parseFloat(b.name))}
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke={isDarkMode ? "#333" : "#e0e0e0"}
+              />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: isDarkMode ? "#d1d5db" : "#333" }}
+              />
+              <YAxis tick={{ fill: isDarkMode ? "#d1d5db" : "#333" }} />
+              <Tooltip
+                formatter={(value) => [`${value} equipos`, "Cantidad"]}
+                contentStyle={{
+                  backgroundColor: isDarkMode ? "#2d2d2d" : "#fff",
+                  borderColor: isDarkMode ? "#444" : "#ccc",
+                }}
+              />
+              <Bar dataKey="value" fill="#3F51B5">
+                {Object.entries(stats.ram.distribution)
+                  .map(([size, count]) => ({
+                    name: `${size} GB`,
+                    value: count,
+                  }))
+                  .sort((a, b) => parseFloat(a.name) - parseFloat(b.name))
+                  .map((entry, index) => (
+                    <Cell
+                      key={`cell-ram-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Gráfico de distribución por tipo de almacenamiento */}
+      {stats.storage && stats.storage.total > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+          <div
+            className={`${
+              isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
+            } p-4 rounded-lg`}
+          >
+            <h3 className="text-lg font-medium mb-4 text-center">
+              Distribución por tipo de disco
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={Object.entries(stats.storage.byType).map(
+                    ([name, value]) => ({
+                      name,
+                      value,
+                    })
+                  )}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) =>
+                    `${name} ${(percent * 100).toFixed(1)}%`
+                  }
+                >
+                  {Object.entries(stats.storage.byType).map(
+                    ([name, value], index) => (
+                      <Cell
+                        key={`cell-storage-type-${index}`}
+                        fill={
+                          name === "SSD"
+                            ? "#4CAF50"
+                            : name === "HDD"
+                            ? "#FF9800"
+                            : "#9E9E9E"
+                        }
+                      />
+                    )
+                  )}
+                </Pie>
+                <Tooltip
+                  formatter={(value) => [`${value} equipos`, "Cantidad"]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Gráfico de capacidades más comunes */}
+          <div
+            className={`${
+              isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
+            } p-4 rounded-lg`}
+          >
+            <h3 className="text-lg font-medium mb-4 text-center">
+              Capacidades de almacenamiento más comunes
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart
+                data={Object.entries(stats.storage.byCapacity)
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 5)
+                  .map(([capacity, count]) => ({
+                    name:
+                      capacity >= 1000
+                        ? `${capacity / 1000} TB`
+                        : `${capacity} GB`,
+                    value: count,
+                  }))}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke={isDarkMode ? "#333" : "#e0e0e0"}
+                />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: isDarkMode ? "#d1d5db" : "#333" }}
+                />
+                <YAxis tick={{ fill: isDarkMode ? "#d1d5db" : "#333" }} />
+                <Tooltip
+                  formatter={(value) => [`${value} equipos`, "Cantidad"]}
+                  contentStyle={{
+                    backgroundColor: isDarkMode ? "#2d2d2d" : "#fff",
+                    borderColor: isDarkMode ? "#444" : "#ccc",
+                  }}
+                />
+                <Bar dataKey="value" fill="#673AB7">
+                  {Object.entries(stats.storage.byCapacity)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map((_, index) => (
+                      <Cell
+                        key={`cell-storage-cap-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

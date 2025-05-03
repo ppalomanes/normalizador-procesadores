@@ -26,26 +26,53 @@ const ValidationRulesEditor = () => {
 
   // Manejar cambios en los inputs
   const handleChange = (category, processor, field, value) => {
-    // Convertir a número si es numérico
-    if (field === "minGeneration" || field === "minSpeed") {
-      value = parseFloat(value);
-    }
+    // Si es para procesadores
+    if (
+      category === "intelCore" ||
+      category === "amdRyzen" ||
+      category === "otherProcessors"
+    ) {
+      // Convertir a número si es numérico
+      if (field === "minGeneration" || field === "minSpeed") {
+        value = parseFloat(value);
+      }
 
-    // Manejar checkbox
-    if (field === "enabled") {
-      value = value === true;
-    }
+      // Manejar checkbox
+      if (field === "enabled") {
+        value = value === true;
+      }
 
-    setEditedRules((prevRules) => ({
-      ...prevRules,
-      [category]: {
-        ...prevRules[category],
-        [processor]: {
-          ...prevRules[category][processor],
+      setEditedRules((prevRules) => ({
+        ...prevRules,
+        [category]: {
+          ...prevRules[category],
+          [processor]: {
+            ...prevRules[category][processor],
+            [field]: value,
+          },
+        },
+      }));
+    }
+    // Para las nuevas secciones de RAM y almacenamiento
+    else if (category === "ram" || category === "storage") {
+      // Para los campos numéricos
+      if (field === "minCapacity") {
+        value = parseFloat(value);
+      }
+
+      // Para los campos booleanos
+      if (field === "preferSSD") {
+        value = value === true;
+      }
+
+      setEditedRules((prevRules) => ({
+        ...prevRules,
+        [category]: {
+          ...(prevRules[category] || {}),
           [field]: value,
         },
-      },
-    }));
+      }));
+    }
   };
 
   // Guardar cambios
@@ -239,12 +266,12 @@ const ValidationRulesEditor = () => {
               isDarkMode ? "text-dark-text-secondary" : "text-gray-600"
             }`}
           >
-            Personalice los requisitos mínimos que deben cumplir los
-            procesadores para ser considerados válidos en la auditoría.
+            Personalice los requisitos mínimos que deben cumplir los componentes
+            para ser considerados válidos en la auditoría.
           </p>
 
           {/* Navegación entre secciones */}
-          <div className="flex border-b mb-4">
+          <div className="flex border-b mb-4 flex-wrap">
             <button
               className={`py-2 px-4 font-medium ${
                 activeSection === "intelCore"
@@ -287,6 +314,34 @@ const ValidationRulesEditor = () => {
             >
               Otros procesadores
             </button>
+            <button
+              className={`py-2 px-4 font-medium ${
+                activeSection === "ram"
+                  ? isDarkMode
+                    ? "border-b-2 border-blue-500 text-blue-400"
+                    : "border-b-2 border-blue-600 text-blue-600"
+                  : isDarkMode
+                  ? "text-dark-text-secondary"
+                  : "text-gray-600"
+              }`}
+              onClick={() => setActiveSection("ram")}
+            >
+              Memoria RAM
+            </button>
+            <button
+              className={`py-2 px-4 font-medium ${
+                activeSection === "storage"
+                  ? isDarkMode
+                    ? "border-b-2 border-blue-500 text-blue-400"
+                    : "border-b-2 border-blue-600 text-blue-600"
+                  : isDarkMode
+                  ? "text-dark-text-secondary"
+                  : "text-gray-600"
+              }`}
+              onClick={() => setActiveSection("storage")}
+            >
+              Almacenamiento
+            </button>
           </div>
 
           {/* Formulario según sección activa */}
@@ -319,6 +374,106 @@ const ValidationRulesEditor = () => {
                 {Object.keys(editedRules.otherProcessors).map((processorKey) =>
                   renderProcessorFields("otherProcessors", processorKey)
                 )}
+              </>
+            )}
+
+            {activeSection === "ram" && (
+              <>
+                <h3 className="text-lg font-medium mb-3">Memoria RAM</h3>
+                <div
+                  className={`p-4 mb-2 rounded-lg ${
+                    isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
+                  }`}
+                >
+                  <h4 className="font-medium mb-3">
+                    Configuración de Memoria RAM
+                  </h4>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-1">
+                      Capacidad mínima (GB)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={editedRules.ram?.minCapacity || 8}
+                      onChange={(e) =>
+                        handleChange("ram", null, "minCapacity", e.target.value)
+                      }
+                      className={`w-full px-3 py-2 border rounded-md text-sm ${
+                        isDarkMode
+                          ? "bg-dark-bg-secondary border-dark-border text-dark-text-primary"
+                          : "bg-white border-gray-300"
+                      }`}
+                    />
+                    <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                      Capacidad mínima requerida en GB
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeSection === "storage" && (
+              <>
+                <h3 className="text-lg font-medium mb-3">Almacenamiento</h3>
+                <div
+                  className={`p-4 mb-2 rounded-lg ${
+                    isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
+                  }`}
+                >
+                  <h4 className="font-medium mb-3">
+                    Configuración de Almacenamiento
+                  </h4>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-1">
+                      Capacidad mínima (GB)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={editedRules.storage?.minCapacity || 256}
+                      onChange={(e) =>
+                        handleChange(
+                          "storage",
+                          null,
+                          "minCapacity",
+                          e.target.value
+                        )
+                      }
+                      className={`w-full px-3 py-2 border rounded-md text-sm ${
+                        isDarkMode
+                          ? "bg-dark-bg-secondary border-dark-border text-dark-text-primary"
+                          : "bg-white border-gray-300"
+                      }`}
+                    />
+                    <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                      Capacidad mínima requerida en GB
+                    </p>
+                  </div>
+                  <div className="mb-3">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={editedRules.storage?.preferSSD || false}
+                        onChange={(e) =>
+                          handleChange(
+                            "storage",
+                            null,
+                            "preferSSD",
+                            e.target.checked
+                          )
+                        }
+                        className="form-checkbox h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2 text-sm">Preferir SSD</span>
+                    </label>
+                    <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                      Si está marcado, solo se considerarán válidos los SSD
+                    </p>
+                  </div>
+                </div>
               </>
             )}
           </div>

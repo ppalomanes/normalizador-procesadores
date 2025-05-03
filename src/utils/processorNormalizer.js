@@ -33,10 +33,15 @@ export const normalizeProcessor = (processor, customRules = null) => {
     };
   }
 
-  // Eliminar caracteres y palabras innecesarias
+  // Primero guardar el texto original antes de cualquier limpieza
+  const original = processor.trim();
+
+  // Eliminar caracteres y palabras innecesarias, pero preservar información importante
+  // MODIFICADO: Ahora manejamos (R) y (TM) de manera diferente
   let cleaned = processor
     .replace(/\[.*?\]/g, "") // Eliminar texto entre corchetes
-    .replace(/\(.*?\)/g, " ") // Eliminar texto entre paréntesis
+    .replace(/\(R\)|\(TM\)|\(tm\)|\(r\)/gi, "") // Eliminar símbolos de marca registrada
+    .replace(/\((?!R\)|TM\)|tm\)|r\)).*?\)/g, " ") // Eliminar otros textos entre paréntesis
     .replace(
       /processor|cpu|procesador|@|with|con|de|dual|quad|core|cores|núcleos/gi,
       " "
@@ -70,6 +75,7 @@ export const normalizeProcessor = (processor, customRules = null) => {
   } else {
     // Intentar detectar marca por contexto
     const knownBrands = [
+      { pattern: /\bi[3579][-\s]/i, brand: "Intel" }, // MODIFICADO: Patrón mejorado para i3, i5, i7, i9
       { pattern: /core\s*i[3579]/i, brand: "Intel" },
       { pattern: /pentium|celeron|xeon/i, brand: "Intel" },
       { pattern: /ryzen|phenom|athlon|threadripper|epyc/i, brand: "AMD" },
@@ -89,8 +95,12 @@ export const normalizeProcessor = (processor, customRules = null) => {
 
   // Extraer modelo con patrones más específicos
   if (brand === "Intel") {
-    // Patrones para Intel Core
-    if (/core\s*i[3579]/i.test(cleaned)) {
+    // MODIFICADO: Patrones mejorados para Intel Core
+    // Primero intentamos detectar patrón "Core i[3579]" explícito - ahora detecta i5 sin número posterior
+    if (
+      /core\s*i[3579]/i.test(cleaned) ||
+      /\bi[3579](?:[-\s]\d|$)/i.test(cleaned)
+    ) {
       // Identificar modelos i3, i5, i7, i9
       if (/i3/i.test(cleaned)) {
         model = "Core i3";
@@ -104,33 +114,46 @@ export const normalizeProcessor = (processor, customRules = null) => {
         model = "Core (otro)";
       }
 
-      // Extraer número de modelo con patrones más flexibles
-      // Buscar patrones como i5-10400F, i7 9700K, i3 8100, etc.
+      // MODIFICADO: Patrones mejorados para extraer número de modelo
       const modelPatterns = [
         /i[3579][\s-]+(\d{3,5}[A-Z]*)/i, // i5-10400F, i7-9700K
         /i[3579][\s-]+(\d{1,2}\d{2,3}[A-Z]*)/i, // i5 10400F, i7 9700K
+        /i[3579][\s-]+(\d+)/i, // Patrón más simple para capturar casos básicos
+        /i[3579](\d{4,5}[A-Z]*)/i, // Para casos como i54440 (sin separador)
       ];
 
       for (const pattern of modelPatterns) {
         const match = cleaned.match(pattern);
         if (match) {
           modelNumber = match[1];
+
+          // Si encontramos un formato como "i54440", reformatear a "4440"
+          if (pattern.toString().includes("(\\d{4,5}[A-Z]*)") && modelNumber) {
+            // Añadir un guion para normalizar el formato
+            model = model.replace(/i(\d)$/, "i$1"); // Asegurarnos que el formato sea "Core i5" y no "Core i 5"
+          }
+
           break;
         }
       }
 
-      // Extraer generación del número de modelo si está disponible
-      if (modelNumber && /^\d{4}/.test(modelNumber)) {
-        // Para modelos como 10400, 9700K, etc.
-        const genNumber = modelNumber.charAt(0);
-        if (/^\d$/.test(genNumber)) {
-          generation = `${genNumber}th Gen`;
+      // MODIFICADO: Extracción de generación mejorada
+      if (modelNumber) {
+        // Si el modelo es de 4 dígitos (como 10400, 9700K)
+        if (/^\d{4}/.test(modelNumber)) {
+          generation = modelNumber.charAt(0);
         }
-      } else if (modelNumber && /^\d{3}/.test(modelNumber)) {
-        // Para modelos de 3 dígitos como 980, 850, etc.
-        const genChar = modelNumber.charAt(0);
-        if (genChar) {
-          generation = `${genChar}th Gen`;
+        // Si el modelo es de 3 dígitos (como 980, 850)
+        else if (/^\d{3}/.test(modelNumber)) {
+          generation = modelNumber.charAt(0);
+        }
+        // Si el modelo tiene otro formato pero empieza con dígitos
+        else if (/^\d+/.test(modelNumber)) {
+          const genDigits = modelNumber.match(/^(\d+)/);
+          if (genDigits && genDigits[1].length <= 2) {
+            // Solo considerar números de 1-2 dígitos como generación
+            generation = genDigits[1];
+          }
         }
       }
 
@@ -213,20 +236,58 @@ export const normalizeProcessor = (processor, customRules = null) => {
         generation = `v${genMatch[1]}`;
       }
     } else {
-      model = "Otro Intel";
+      // MODIFICADO: Intentar detectar modelos Core i[3579] sin la palabra "Core"
+      let coreFound = false;
+
+      // Detectar patrones como "i5-4440" sin "Core"
+      const coreMatch = cleaned.match(/\bi([3579])[\s-]+(\d{3,5}[A-Z]*)/i);
+      if (coreMatch) {
+        const series = coreMatch[1];
+        model = `Core i${series}`;
+        modelNumber = coreMatch[2];
+        coreFound = true;
+      }
+
+      // Detectar patrones como "i54440" sin espacios ni guiones
+      const directMatch = cleaned.match(/\bi([3579])(\d{4,5}[A-Z]*)/i);
+      if (!coreFound && directMatch) {
+        const series = directMatch[1];
+        model = `Core i${series}`;
+        modelNumber = directMatch[2];
+        coreFound = true;
+      }
+
+      // Detectar "i3", "i5", "i7", "i9" sin número de modelo
+      const simpleMatch = cleaned.match(/\bi([3579])(?!\d)/i);
+      if (!coreFound && simpleMatch) {
+        const series = simpleMatch[1];
+        model = `Core i${series}`;
+        coreFound = true;
+      }
+
+      // Extraer generación del número de modelo si lo encontramos
+      if (coreFound && modelNumber) {
+        if (/^\d{4}/.test(modelNumber) || /^\d{3}/.test(modelNumber)) {
+          generation = modelNumber.charAt(0);
+        }
+      }
+
+      if (!coreFound) {
+        model = "Otro Intel";
+      }
     }
   } else if (brand === "AMD") {
     // Mejorar detección de modelos AMD con patrones más flexibles
 
     // Ryzen series (3000, 5000, 7000)
     const ryzenSeries = {
-      1: "1st Gen",
-      2: "2nd Gen",
-      3: "3rd Gen",
-      4: "4th Gen",
-      5: "5th Gen",
-      7: "7th Gen",
-      9: "9th Gen",
+      1: "1",
+      2: "2",
+      3: "3",
+      4: "4",
+      5: "5",
+      7: "7",
+      9: "9",
     };
 
     if (/ryzen/i.test(cleaned)) {
@@ -399,7 +460,7 @@ export const normalizeProcessor = (processor, customRules = null) => {
         modelNumber = match[1];
         if (match[2]) {
           // Si capturó un número de generación
-          generation = `Gen ${match[2]}`;
+          generation = match[2];
         }
         break;
       }
@@ -490,6 +551,38 @@ export const normalizeProcessor = (processor, customRules = null) => {
     } else {
       model = "Exynos";
     }
+  } else if (brand === "Broadcom") {
+    // MODIFICADO: Soporte específico para chips Broadcom
+    if (/bcm2835/i.test(cleaned)) {
+      model = "BCM2835";
+    } else {
+      const bcmMatch = cleaned.match(/bcm(\d+)/i);
+      if (bcmMatch) {
+        model = `BCM${bcmMatch[1]}`;
+      } else {
+        model = "Otro Broadcom";
+      }
+    }
+  }
+
+  // MODIFICADO: Verificar si tenemos modelos Intel específicos sin marca
+  if (brand === "Otro" && /\bi[3579][-\s]\d/i.test(cleaned)) {
+    brand = "Intel";
+    const seriesMatch = cleaned.match(/\bi([3579])/i);
+    if (seriesMatch) {
+      model = `Core i${seriesMatch[1]}`;
+
+      // Intentar extraer el número de modelo
+      const modelMatch = cleaned.match(/i[3579][\s-]+(\d{3,5}[A-Z]*)/i);
+      if (modelMatch) {
+        modelNumber = modelMatch[1];
+
+        // Extraer generación
+        if (/^\d{4}/.test(modelNumber) || /^\d{3}/.test(modelNumber)) {
+          generation = modelNumber.charAt(0);
+        }
+      }
+    }
   }
 
   // Buscar generación explícitamente mencionada si aún no la tenemos
@@ -504,13 +597,13 @@ export const normalizeProcessor = (processor, customRules = null) => {
       const match = cleaned.match(pattern);
       if (match) {
         const genNumber = parseInt(match[1]);
-        generation = `${genNumber}th Gen`;
+        generation = `${genNumber}`;
         break;
       }
     }
   }
 
-  // Extraer velocidad con patrones mejorados
+  // MODIFICADO: Extraer velocidad con patrones mejorados
   const speedRegexPatterns = [
     /(\d+[\.,]\d+)\s*(?:GHz|ghz|Ghz|gh|G)/i, // Formato 3.4GHz
     /@\s*(\d+[\.,]\d+)/i, // Formato @ 3.4
@@ -523,7 +616,7 @@ export const normalizeProcessor = (processor, customRules = null) => {
     const speedMatch = cleaned.match(pattern);
     if (speedMatch) {
       // Normalizar formatos de decimales
-      speed = parseFloat(speedMatch[1].replace(",", ".")) + " GHz";
+      speed = parseFloat(speedMatch[1].replace(",", ".")).toFixed(1) + " GHz";
       break;
     }
   }
@@ -540,7 +633,10 @@ export const normalizeProcessor = (processor, customRules = null) => {
 
     if (possibleSpeeds.length > 0) {
       // Tomar el valor más alto como la velocidad probable
-      speed = Math.max(...possibleSpeeds) + " GHz";
+      speed =
+        possibleSpeeds
+          .reduce((max, current) => Math.max(max, current), 0)
+          .toFixed(1) + " GHz";
     }
   }
 
@@ -553,22 +649,21 @@ export const normalizeProcessor = (processor, customRules = null) => {
     }
   }
 
-  // Construir cadena normalizada
+  // MODIFICADO: Construir cadena normalizada
+  // Ahora incluiremos explícitamente el número de modelo y la generación si están disponibles
   let normalized = `${brand} ${model}`;
+
   if (modelNumber) {
-    normalized += ` ${modelNumber}`;
+    // Para procesadores Intel Core, asegurarse de usar el guion
+    if (brand === "Intel" && /Core i[3579]/i.test(model)) {
+      normalized += `-${modelNumber}`;
+    } else {
+      normalized += ` ${modelNumber}`;
+    }
   }
-  if (extraInfo) {
-    normalized += ` ${extraInfo}`;
-  }
-  if (generation) {
-    normalized += ` ${generation}`;
-  }
+
   if (speed) {
     normalized += ` @ ${speed}`;
-  }
-  if (architecture) {
-    normalized += ` (${architecture})`;
   }
 
   // Verificar si cumple con los requisitos (reglas mejoradas)
@@ -943,17 +1038,17 @@ export const normalizeProcessor = (processor, customRules = null) => {
   }
 
   return {
-    original: processor,
-    brand,
-    model,
-    modelNumber,
-    generation,
-    extraInfo,
-    architecture,
-    speed,
-    speedValue,
-    normalized,
-    meetsRequirements,
-    reason,
+    original: original,
+    brand: brand,
+    model: model,
+    modelNumber: modelNumber,
+    generation: generation,
+    extraInfo: extraInfo,
+    architecture: architecture,
+    speed: speed,
+    speedValue: speedValue,
+    normalized: normalized,
+    meetsRequirements: meetsRequirements,
+    reason: reason,
   };
 };

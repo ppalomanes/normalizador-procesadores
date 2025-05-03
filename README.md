@@ -22,6 +22,7 @@ Aplicación web para normalizar y analizar información de procesadores, facilit
 
 ## Instalación
 
+<<<<<<< HEAD
 \`\`\`bash
 # Clonar el repositorio
 git clone https://github.com/ppalomanes/normalizador-procesadores.git
@@ -35,3 +36,20 @@ npm install
 # Iniciar la aplicación
 npm start
 \`\`\`
+=======
+### Clonar el repositorio
+
+git clone <https://github.com/ppalomanes/normalizador-procesadores.git>
+
+### Navegar al directorio
+
+cd normalizador-procesadores
+
+### Instalar dependencias
+
+npm install
+
+### Iniciar la aplicación
+
+npm start
+>>>>>>> 376ba51 (Mejoras en normalización de hardware y actualizaciones varias)

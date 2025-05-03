@@ -69,6 +69,17 @@ const defaultRules = {
       name: "AMD Athlon",
     },
   },
+  // Nuevas reglas para RAM
+  ram: {
+    minCapacity: 8, // Mínimo 8GB de RAM
+    name: "Memoria RAM",
+  },
+  // Nuevas reglas para almacenamiento
+  storage: {
+    minCapacity: 256, // Mínimo 256GB de almacenamiento
+    preferSSD: true, // Preferir SSD sobre HDD
+    name: "Almacenamiento",
+  },
 };
 
 // Crear el contexto
@@ -76,10 +87,31 @@ export const ValidationRulesContext = createContext();
 
 export const ValidationRulesProvider = ({ children }) => {
   // Cargar reglas guardadas o usar predeterminadas
-  const storedRules = localStorage.getItem("validationRules");
-  const [rules, setRules] = useState(
-    storedRules ? JSON.parse(storedRules) : defaultRules
-  );
+  const [rules, setRules] = useState(() => {
+    try {
+      const storedRules = localStorage.getItem("validationRules");
+      if (storedRules) {
+        const parsedRules = JSON.parse(storedRules);
+        // Asegurarse de que las secciones RAM y almacenamiento existan
+        return {
+          ...defaultRules,
+          ...parsedRules,
+          ram: {
+            ...defaultRules.ram,
+            ...(parsedRules.ram || {}),
+          },
+          storage: {
+            ...defaultRules.storage,
+            ...(parsedRules.storage || {}),
+          },
+        };
+      }
+      return defaultRules;
+    } catch (error) {
+      console.error("Error al cargar reglas:", error);
+      return defaultRules;
+    }
+  });
 
   // Guardar reglas cuando cambien
   useEffect(() => {
@@ -102,7 +134,7 @@ export const ValidationRulesProvider = ({ children }) => {
     const dataUri =
       "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
 
-    const exportFileDefaultName = "processor_validation_rules.json";
+    const exportFileDefaultName = "hardware_validation_rules.json";
 
     const linkElement = document.createElement("a");
     linkElement.setAttribute("href", dataUri);
@@ -123,7 +155,21 @@ export const ValidationRulesProvider = ({ children }) => {
           importedRules.amdRyzen &&
           importedRules.otherProcessors
         ) {
-          setRules(importedRules);
+          // Asegurarse de que las secciones RAM y almacenamiento existan
+          const mergedRules = {
+            ...defaultRules,
+            ...importedRules,
+            ram: {
+              ...defaultRules.ram,
+              ...(importedRules.ram || {}),
+            },
+            storage: {
+              ...defaultRules.storage,
+              ...(importedRules.storage || {}),
+            },
+          };
+
+          setRules(mergedRules);
           return { success: true, message: "Reglas importadas correctamente" };
         } else {
           return {

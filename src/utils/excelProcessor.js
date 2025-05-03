@@ -1,9 +1,15 @@
 // utils/excelProcessor.js
 import * as XLSX from "xlsx";
 import { normalizeProcessor } from "./processorNormalizer";
+import {
+  normalizeRAM,
+  validateRAM,
+  normalizeStorage,
+  validateStorage,
+} from "./hardwareNormalizer";
 
 /**
- * Procesa un archivo Excel con información de procesadores
+ * Procesa un archivo Excel con información de hardware
  * @param {ArrayBuffer} excelBuffer - Buffer del archivo Excel
  * @param {Object} rules - Reglas personalizadas (opcional)
  * @returns {Object} Objecto con datos normalizados y estadísticas
@@ -44,90 +50,237 @@ export const processExcelFile = async (excelBuffer, rules = null) => {
       );
     }
 
-    // Buscar la columna del procesador
-    const findProcessorColumn = (row) => {
-      const possibleNames = [
-        "procesador",
-        "processor",
-        "cpu",
-        "micro",
-        "microprocesador",
-      ];
-
-      // Buscar columnas que contengan palabras clave
+    // Buscar columnas para procesador, RAM y almacenamiento
+    const findColumns = (row) => {
+      // Buscar columna procesador
       const processorKey = Object.keys(row).find((key) => {
         if (!key || typeof key !== "string") return false;
         const lowerKey = key.toLowerCase();
-        return possibleNames.some((name) => lowerKey.includes(name));
+        return [
+          "procesador",
+          "processor",
+          "cpu",
+          "micro",
+          "microprocesador",
+        ].some((name) => lowerKey.includes(name));
       });
 
-      return processorKey;
+      // Buscar columna RAM
+      const ramKey = Object.keys(row).find((key) => {
+        if (!key || typeof key !== "string") return false;
+        const lowerKey = key.toLowerCase();
+        return ["ram", "memoria", "memory"].some((name) =>
+          lowerKey.includes(name)
+        );
+      });
+
+      // Buscar columna almacenamiento
+      const storageKey = Object.keys(row).find((key) => {
+        if (!key || typeof key !== "string") return false;
+        const lowerKey = key.toLowerCase();
+        return [
+          "disco",
+          "disk",
+          "hdd",
+          "ssd",
+          "storage",
+          "almacenamiento",
+        ].some((name) => lowerKey.includes(name));
+      });
+
+      return { processorKey, ramKey, storageKey };
     };
 
-    // Determinar la columna de procesador basado en la primera fila
-    const processorColumn = findProcessorColumn(jsonData[0]);
+    // Determinar columnas basadas en la primera fila
+    const { processorKey, ramKey, storageKey } = findColumns(jsonData[0]);
 
-    if (!processorColumn) {
+    if (!processorKey) {
       throw new Error(
         "No se pudo identificar una columna de procesador en el archivo. " +
           "Asegúrese de que exista una columna con un nombre que contenga 'procesador', 'processor' o 'cpu'."
       );
     }
 
-    // Normalizar los procesadores con manejo de errores y progreso
+    // Normalizar los datos con manejo de errores y progreso
     const normalizedData = jsonData.map((row) => {
-      if (processorColumn && row[processorColumn]) {
+      let result = { ...row };
+      let processorResult = {
+        meetsRequirements: false,
+        reason: "No se procesó",
+      };
+      let ramResult = { meetsRequirements: true, reason: "" }; // Por defecto true si no hay columna
+      let storageResult = { meetsRequirements: true, reason: "" }; // Por defecto true si no hay columna
+
+      // Procesar CPU
+      if (processorKey && row[processorKey]) {
         try {
           const normalizedProcessor = normalizeProcessor(
-            row[processorColumn],
+            row[processorKey],
             rules
           );
+          processorResult = {
+            normalized: normalizedProcessor.normalized,
+            brand: normalizedProcessor.brand,
+            model: normalizedProcessor.model,
+            generation: normalizedProcessor.generation || "N/A",
+            speed: normalizedProcessor.speed || "N/A",
+            meetsRequirements: normalizedProcessor.meetsRequirements,
+            reason: normalizedProcessor.reason || "",
+          };
 
-          // Añadir columnas con información normalizada
-          return {
-            ...row,
+          // Añadir resultados al objeto
+          result = {
+            ...result,
             "Procesador Normalizado": normalizedProcessor.normalized,
             "Marca Procesador": normalizedProcessor.brand,
             "Modelo Procesador": normalizedProcessor.model,
             Generación: normalizedProcessor.generation || "N/A",
             Velocidad: normalizedProcessor.speed || "N/A",
-            "Cumple Requisitos": normalizedProcessor.meetsRequirements
-              ? "Sí"
-              : "No",
-            "Motivo Incumplimiento": normalizedProcessor.meetsRequirements
-              ? ""
-              : normalizedProcessor.reason,
+            "Cumple Requisitos Procesador":
+              normalizedProcessor.meetsRequirements ? "Sí" : "No",
+            "Motivo Incumplimiento Procesador":
+              normalizedProcessor.meetsRequirements
+                ? ""
+                : normalizedProcessor.reason,
           };
         } catch (error) {
           console.error(
-            `Error normalizando procesador: ${row[processorColumn]}`,
+            `Error normalizando procesador: ${row[processorKey]}`,
             error
           );
+          processorResult = {
+            meetsRequirements: false,
+            reason: "Error en procesamiento",
+          };
 
-          // En caso de error, mantener la fila original pero marcarla como no procesada
-          return {
+          result = {
             ...row,
             "Procesador Normalizado": "Error: No se pudo procesar",
             "Marca Procesador": "Desconocido",
             "Modelo Procesador": "Desconocido",
             Generación: "N/A",
             Velocidad: "N/A",
-            "Cumple Requisitos": "No",
-            "Motivo Incumplimiento": "Error en procesamiento",
+            "Cumple Requisitos Procesador": "No",
+            "Motivo Incumplimiento Procesador": "Error en procesamiento",
           };
         }
       }
 
-      return {
-        ...row,
-        "Procesador Normalizado": "Información no disponible",
-        "Marca Procesador": "Desconocido",
-        "Modelo Procesador": "Desconocido",
-        Generación: "N/A",
-        Velocidad: "N/A",
-        "Cumple Requisitos": "No",
-        "Motivo Incumplimiento": "Datos de procesador no válidos",
+      // Procesar RAM si existe columna
+      if (ramKey && row[ramKey]) {
+        try {
+          const normalizedRAM = normalizeRAM(row[ramKey]);
+          const ramValidation = validateRAM(normalizedRAM, rules);
+          ramResult = {
+            ...normalizedRAM,
+            meetsRequirements: ramValidation.meetsRequirements,
+            reason: ramValidation.reason || "",
+          };
+
+          // Añadir resultados al objeto
+          result = {
+            ...result,
+            "RAM Normalizada": normalizedRAM.normalized,
+            "Capacidad RAM": `${normalizedRAM.capacityGB} GB`,
+            "Tipo RAM": normalizedRAM.type,
+            "Cumple Requisitos RAM": ramValidation.meetsRequirements
+              ? "Sí"
+              : "No",
+            "Motivo Incumplimiento RAM": ramValidation.meetsRequirements
+              ? ""
+              : ramValidation.reason,
+          };
+        } catch (error) {
+          console.error(`Error normalizando RAM: ${row[ramKey]}`, error);
+          ramResult = {
+            meetsRequirements: false,
+            reason: "Error en procesamiento",
+          };
+
+          result = {
+            ...result,
+            "RAM Normalizada": "Error: No se pudo procesar",
+            "Capacidad RAM": "Desconocida",
+            "Tipo RAM": "Desconocido",
+            "Cumple Requisitos RAM": "No",
+            "Motivo Incumplimiento RAM": "Error en procesamiento",
+          };
+        }
+      }
+
+      // Procesar almacenamiento si existe columna
+      if (storageKey && row[storageKey]) {
+        try {
+          const normalizedStorage = normalizeStorage(row[storageKey]);
+          const storageValidation = validateStorage(normalizedStorage, rules);
+          storageResult = {
+            ...normalizedStorage,
+            meetsRequirements: storageValidation.meetsRequirements,
+            reason: storageValidation.reason || "",
+          };
+
+          // Añadir resultados al objeto
+          result = {
+            ...result,
+            "Almacenamiento Normalizado": normalizedStorage.normalized,
+            "Capacidad Almacenamiento": `${normalizedStorage.displayCapacity} ${normalizedStorage.displayUnit}`,
+            "Tipo Almacenamiento": normalizedStorage.type,
+            "Cumple Requisitos Almacenamiento":
+              storageValidation.meetsRequirements ? "Sí" : "No",
+            "Motivo Incumplimiento Almacenamiento":
+              storageValidation.meetsRequirements
+                ? ""
+                : storageValidation.reason,
+          };
+        } catch (error) {
+          console.error(
+            `Error normalizando almacenamiento: ${row[storageKey]}`,
+            error
+          );
+          storageResult = {
+            meetsRequirements: false,
+            reason: "Error en procesamiento",
+          };
+
+          result = {
+            ...result,
+            "Almacenamiento Normalizado": "Error: No se pudo procesar",
+            "Capacidad Almacenamiento": "Desconocida",
+            "Tipo Almacenamiento": "Desconocido",
+            "Cumple Requisitos Almacenamiento": "No",
+            "Motivo Incumplimiento Almacenamiento": "Error en procesamiento",
+          };
+        }
+      }
+
+      // Determinar cumplimiento global basado en reglas
+      const overallCompliance =
+        processorResult.meetsRequirements &&
+        ramResult.meetsRequirements &&
+        storageResult.meetsRequirements;
+
+      // Determinar motivo de incumplimiento global
+      let overallReason = "";
+      if (!overallCompliance) {
+        if (!processorResult.meetsRequirements) {
+          overallReason =
+            processorResult.reason || "Procesador no cumple requisitos";
+        } else if (!ramResult.meetsRequirements) {
+          overallReason = ramResult.reason || "RAM no cumple requisitos";
+        } else if (!storageResult.meetsRequirements) {
+          overallReason =
+            storageResult.reason || "Almacenamiento no cumple requisitos";
+        }
+      }
+
+      // Actualizar campos generales
+      result = {
+        ...result,
+        "Cumple Requisitos": overallCompliance ? "Sí" : "No",
+        "Motivo Incumplimiento": overallReason,
       };
+
+      return result;
     });
 
     // Generar estadísticas
@@ -135,9 +288,7 @@ export const processExcelFile = async (excelBuffer, rules = null) => {
     const meetingReqs = normalizedData.filter(
       (row) => row["Cumple Requisitos"] === "Sí"
     ).length;
-    const notMeetingReqs = normalizedData.filter(
-      (row) => row["Cumple Requisitos"] === "No"
-    ).length;
+    const notMeetingReqs = totalRows - meetingReqs;
 
     // Contar por marca
     const brandCount = {};
@@ -182,6 +333,96 @@ export const processExcelFile = async (excelBuffer, rules = null) => {
       brandModelCount[key] = (brandModelCount[key] || 0) + 1;
     });
 
+    // Estadísticas de RAM
+    const ramStats = {
+      total: 0,
+      meetingRequirements: 0,
+      notMeetingRequirements: 0,
+      distribution: {},
+      avg: 0,
+    };
+
+    // Estadísticas de almacenamiento
+    const storageStats = {
+      total: 0,
+      meetingRequirements: 0,
+      notMeetingRequirements: 0,
+      byType: {},
+      byCapacity: {},
+      avgCapacity: 0,
+    };
+
+    // Calcular estadísticas para RAM
+    let totalRAM = 0;
+    normalizedData.forEach((row) => {
+      if (row["Capacidad RAM"]) {
+        ramStats.total++;
+        const capacityMatch = row["Capacidad RAM"].match(/(\d+(?:\.\d+)?)/);
+        if (capacityMatch) {
+          const capacity = parseFloat(capacityMatch[1]);
+          totalRAM += capacity;
+
+          // Distribución por tamaños
+          if (!ramStats.distribution[capacity]) {
+            ramStats.distribution[capacity] = 0;
+          }
+          ramStats.distribution[capacity]++;
+        }
+
+        // Verificar cumplimiento
+        if (row["Cumple Requisitos RAM"] === "Sí") {
+          ramStats.meetingRequirements++;
+        } else {
+          ramStats.notMeetingRequirements++;
+        }
+      }
+    });
+    if (ramStats.total > 0) {
+      ramStats.avg = totalRAM / ramStats.total;
+    }
+
+    // Calcular estadísticas para almacenamiento
+    let totalStorage = 0;
+    normalizedData.forEach((row) => {
+      if (row["Capacidad Almacenamiento"]) {
+        storageStats.total++;
+
+        // Extraer capacidad y convertir a GB para cálculos
+        const capacityMatch = row["Capacidad Almacenamiento"].match(
+          /(\d+(?:\.\d+)?)\s*(TB|GB)/i
+        );
+        if (capacityMatch) {
+          const value = parseFloat(capacityMatch[1]);
+          const unit = capacityMatch[2].toUpperCase();
+          const capacityGB = unit === "TB" ? value * 1000 : value;
+          totalStorage += capacityGB;
+
+          // Agregar a distribución por capacidad
+          if (!storageStats.byCapacity[capacityGB]) {
+            storageStats.byCapacity[capacityGB] = 0;
+          }
+          storageStats.byCapacity[capacityGB]++;
+        }
+
+        // Distribución por tipo
+        const type = row["Tipo Almacenamiento"] || "Desconocido";
+        if (!storageStats.byType[type]) {
+          storageStats.byType[type] = 0;
+        }
+        storageStats.byType[type]++;
+
+        // Verificar cumplimiento
+        if (row["Cumple Requisitos Almacenamiento"] === "Sí") {
+          storageStats.meetingRequirements++;
+        } else {
+          storageStats.notMeetingRequirements++;
+        }
+      }
+    });
+    if (storageStats.total > 0) {
+      storageStats.avgCapacity = totalStorage / storageStats.total;
+    }
+
     // Preparar estadísticas
     const stats = {
       totalProcessors: totalRows,
@@ -193,6 +434,8 @@ export const processExcelFile = async (excelBuffer, rules = null) => {
       generationDistribution: generationCount,
       brandModelDistribution: brandModelCount,
       failureReasons: failureReasons,
+      ram: ramStats,
+      storage: storageStats,
     };
 
     return { normalizedData, stats };
@@ -207,10 +450,7 @@ export const processExcelFile = async (excelBuffer, rules = null) => {
  * @param {Array} data - Datos a exportar
  * @param {String} filename - Nombre del archivo
  */
-export const exportToExcel = (
-  data,
-  filename = "Procesadores_Normalizados.xlsx"
-) => {
+export const exportToExcel = (data, filename = "Hardware_Normalizado.xlsx") => {
   if (!data || data.length === 0) return;
 
   // Crear hoja de trabajo
@@ -227,6 +467,8 @@ export const exportToExcel = (
     { wch: 15 }, // Velocidad
     { wch: 15 }, // Cumple Requisitos
     { wch: 40 }, // Motivo Incumplimiento
+    { wch: 15 }, // RAM
+    { wch: 15 }, // Almacenamiento
   ];
 
   // Aplicar anchos de columna

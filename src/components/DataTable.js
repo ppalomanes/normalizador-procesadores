@@ -80,6 +80,12 @@ const DataTable = ({
       "Modelo Procesador",
       "Generación",
       "Velocidad",
+      "RAM Normalizada",
+      "Capacidad RAM",
+      "Tipo RAM",
+      "Almacenamiento Normalizado",
+      "Capacidad Almacenamiento",
+      "Tipo Almacenamiento",
       "Cumple Requisitos",
       "Motivo Incumplimiento",
     ];

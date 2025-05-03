@@ -12,7 +12,7 @@ const StatsDisplay = ({ stats, normalizedData }) => {
   // Función para descargar el Excel normalizado
   const downloadNormalizedExcel = () => {
     if (!normalizedData) return;
-    exportToExcel(normalizedData, "Procesadores_Normalizados.xlsx");
+    exportToExcel(normalizedData, "Hardware_Normalizado.xlsx");
   };
 
   // Función para descargar un reporte de estadísticas
@@ -60,7 +60,7 @@ const StatsDisplay = ({ stats, normalizedData }) => {
         });
       });
 
-    exportToExcel(reportData, "Estadisticas_Procesadores.xlsx");
+    exportToExcel(reportData, "Estadisticas_Hardware.xlsx");
   };
 
   return (
@@ -199,6 +199,211 @@ const StatsDisplay = ({ stats, normalizedData }) => {
           </div>
         </div>
 
+        {/* Estadísticas de RAM */}
+        {stats.ram && stats.ram.total > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-medium mb-2">
+              Estadísticas de Memoria RAM
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div
+                className={`${
+                  isDarkMode ? "bg-dark-bg-tertiary" : "bg-blue-50"
+                } p-4 rounded-lg`}
+              >
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-blue-300" : "text-blue-700"
+                  } mb-1`}
+                >
+                  Equipos con RAM analizada
+                </p>
+                <p className="text-2xl font-bold">{stats.ram.total}</p>
+              </div>
+
+              <div
+                className={`${
+                  isDarkMode ? "bg-dark-bg-tertiary" : "bg-blue-50"
+                } p-4 rounded-lg`}
+              >
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-blue-300" : "text-blue-700"
+                  } mb-1`}
+                >
+                  Promedio de RAM
+                </p>
+                <p className="text-2xl font-bold">
+                  {stats.ram.avg.toFixed(1)} GB
+                </p>
+              </div>
+
+              <div
+                className={`${
+                  isDarkMode ? "bg-dark-bg-tertiary" : "bg-blue-50"
+                } p-4 rounded-lg`}
+              >
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-blue-300" : "text-blue-700"
+                  } mb-1`}
+                >
+                  Cantidad más común
+                </p>
+                <p className="text-2xl font-bold">
+                  {Object.entries(stats.ram.distribution).sort(
+                    (a, b) => b[1] - a[1]
+                  )[0]?.[0] || "N/A"}{" "}
+                  GB
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`${
+                isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
+              } p-4 rounded-lg`}
+            >
+              <h4 className="font-medium mb-2">Distribución por capacidad</h4>
+              {Object.entries(stats.ram.distribution)
+                .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
+                .map(([size, count]) => (
+                  <div
+                    key={`ram-${size}`}
+                    className={`flex justify-between py-1 border-b ${
+                      isDarkMode ? "border-dark-border" : "border-gray-200"
+                    } last:border-0`}
+                  >
+                    <span className="font-medium">{size} GB</span>
+                    <span>
+                      {count} ({((count / stats.ram.total) * 100).toFixed(1)}%)
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Estadísticas de Almacenamiento */}
+        {stats.storage && stats.storage.total > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-medium mb-2">
+              Estadísticas de Almacenamiento
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div
+                className={`${
+                  isDarkMode ? "bg-dark-bg-tertiary" : "bg-blue-50"
+                } p-4 rounded-lg`}
+              >
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-blue-300" : "text-blue-700"
+                  } mb-1`}
+                >
+                  Equipos con almacenamiento analizado
+                </p>
+                <p className="text-2xl font-bold">{stats.storage.total}</p>
+              </div>
+
+              <div
+                className={`${
+                  isDarkMode ? "bg-dark-bg-tertiary" : "bg-blue-50"
+                } p-4 rounded-lg`}
+              >
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-blue-300" : "text-blue-700"
+                  } mb-1`}
+                >
+                  Promedio de capacidad
+                </p>
+                <p className="text-2xl font-bold">
+                  {stats.storage.avgCapacity >= 1000
+                    ? `${(stats.storage.avgCapacity / 1000).toFixed(1)} TB`
+                    : `${stats.storage.avgCapacity.toFixed(0)} GB`}
+                </p>
+              </div>
+
+              <div
+                className={`${
+                  isDarkMode ? "bg-dark-bg-tertiary" : "bg-blue-50"
+                } p-4 rounded-lg`}
+              >
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-blue-300" : "text-blue-700"
+                  } mb-1`}
+                >
+                  Tipo más común
+                </p>
+                <p className="text-2xl font-bold">
+                  {Object.entries(stats.storage.byType).sort(
+                    (a, b) => b[1] - a[1]
+                  )[0]?.[0] || "N/A"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-medium mb-2">Distribución por tipo</h4>
+                <div
+                  className={`${
+                    isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
+                  } p-4 rounded-lg`}
+                >
+                  {Object.entries(stats.storage.byType).map(([type, count]) => (
+                    <div
+                      key={`storage-type-${type}`}
+                      className={`flex justify-between py-1 border-b ${
+                        isDarkMode ? "border-dark-border" : "border-gray-200"
+                      } last:border-0`}
+                    >
+                      <span className="font-medium">{type}</span>
+                      <span>
+                        {count} (
+                        {((count / stats.storage.total) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Principales capacidades</h4>
+                <div
+                  className={`${
+                    isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
+                  } p-4 rounded-lg`}
+                >
+                  {Object.entries(stats.storage.byCapacity)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([capacity, count]) => (
+                      <div
+                        key={`storage-cap-${capacity}`}
+                        className={`flex justify-between py-1 border-b ${
+                          isDarkMode ? "border-dark-border" : "border-gray-200"
+                        } last:border-0`}
+                      >
+                        <span className="font-medium">
+                          {capacity >= 1000
+                            ? `${capacity / 1000} TB`
+                            : `${capacity} GB`}
+                        </span>
+                        <span>
+                          {count} (
+                          {((count / stats.storage.total) * 100).toFixed(1)}%)
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             onClick={downloadNormalizedExcel}
@@ -225,9 +430,7 @@ const StatsDisplay = ({ stats, normalizedData }) => {
           </button>
 
           <button
-            onClick={() =>
-              exportToPDF(normalizedData, "Procesadores_Normalizados")
-            }
+            onClick={() => exportToPDF(normalizedData, "Hardware_Normalizado")}
             className={`inline-flex items-center px-4 py-2 ${
               isDarkMode
                 ? "bg-purple-700 hover:bg-purple-800"
