@@ -63,6 +63,53 @@ const StatsDisplay = ({ stats, normalizedData }) => {
     exportToExcel(reportData, "Estadisticas_Hardware.xlsx");
   };
 
+  // Función para manejar errores y generar reportes PDF
+  const handleExportToPDF = () => {
+    try {
+      if (!normalizedData) {
+        console.error("No hay datos para exportar");
+        return;
+      }
+      exportToPDF(normalizedData, stats, "Hardware_Normalizado.pdf");
+    } catch (error) {
+      console.error("Error al exportar a PDF:", error);
+      // Intentar con método alternativo
+      try {
+        exportToPDF(normalizedData, "Hardware_Normalizado.pdf");
+      } catch (fallbackError) {
+        console.error("Error en el método alternativo:", fallbackError);
+        alert(
+          "No se pudo generar el PDF. Verifique la consola para más detalles."
+        );
+      }
+    }
+  };
+
+  // Función para manejar errores y generar informes detallados
+  const handleDetailedReport = () => {
+    try {
+      if (!normalizedData || !stats) {
+        console.error("No hay datos suficientes para el informe");
+        return;
+      }
+
+      // Usar el nuevo formato de parámetros
+      exportDetailedReport({ normalizedData, stats }, "Informe_Ejecutivo.pdf");
+    } catch (error) {
+      console.error("Error al generar informe detallado:", error);
+
+      // Intentar con método alternativo
+      try {
+        exportDetailedReport(normalizedData, stats, "Informe_Ejecutivo.pdf");
+      } catch (fallbackError) {
+        console.error("Error en el método alternativo:", fallbackError);
+        alert(
+          "No se pudo generar el informe. Verifique la consola para más detalles."
+        );
+      }
+    }
+  };
+
   return (
     <>
       <div
@@ -430,7 +477,7 @@ const StatsDisplay = ({ stats, normalizedData }) => {
           </button>
 
           <button
-            onClick={() => exportToPDF(normalizedData, "Hardware_Normalizado")}
+            onClick={handleExportToPDF}
             className={`inline-flex items-center px-4 py-2 ${
               isDarkMode
                 ? "bg-purple-700 hover:bg-purple-800"
@@ -442,12 +489,7 @@ const StatsDisplay = ({ stats, normalizedData }) => {
           </button>
 
           <button
-            onClick={() =>
-              exportDetailedReport(
-                { normalizedData, stats },
-                "Informe_Ejecutivo"
-              )
-            }
+            onClick={handleDetailedReport}
             className={`inline-flex items-center px-4 py-2 ${
               isDarkMode
                 ? "bg-indigo-700 hover:bg-indigo-800"
