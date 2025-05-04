@@ -35,12 +35,12 @@ const splitHeaderText = (header) => {
 };
 
 /**
- * Crea una tarjeta con fondo gris para mostrar estadísticas
+ * Crea una tarjeta compacta para mostrar estadísticas
  * @param {Object} doc - Documento PDF
  * @param {Number} x - Posición x inicial
  * @param {Number} y - Posición y inicial
  * @param {Number} width - Ancho de la tarjeta
- * @param {Number} height - Alto de la tarjeta
+ * @param {Number} height - Alto de la tarjeta (reducido para mayor compacidad)
  * @param {String} title - Título a mostrar
  * @param {String} value - Valor principal a mostrar
  * @param {String} subtitle - Subtítulo opcional
@@ -57,64 +57,96 @@ const drawStatCard = (
   subtitle = null,
   colors = [0, 0, 0]
 ) => {
-  // Dibujar fondo
+  // Dibujar fondo más compacto
   doc.setFillColor(240, 240, 245);
-  doc.roundedRect(x, y, width, height, 3, 3, "F");
+  doc.roundedRect(x, y, width, height, 2, 2, "F");
 
-  // Dibujar título
+  // Dibujar título más pequeño
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(8); // Reducido de 9 a 8
   doc.setTextColor(100, 100, 120);
-  doc.text(title, x + 5, y + 12);
+  doc.text(title, x + 4, y + 8); // Ajuste vertical
 
-  // Dibujar valor principal
+  // Dibujar valor principal - tamaño más compacto
+  const valueSize = value.length > 5 ? 14 : 16; // Reducido de 16/20 a 14/16
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
+  doc.setFontSize(valueSize);
   doc.setTextColor(colors[0], colors[1], colors[2]);
-  doc.text(value, x + 5, y + 35);
+  doc.text(value, x + 4, y + 20); // Ajuste vertical
 
-  // Dibujar subtítulo si existe
+  // Dibujar subtítulo si existe - más compacto
   if (subtitle) {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
+    doc.setFontSize(9); // Reducido de 10 a 9
     doc.setTextColor(colors[0], colors[1], colors[2]);
-    doc.text(subtitle, x + value.length * 12 + 10, y + 35);
+    // Posicionar el subtítulo a la derecha del valor principal
+    const valueWidth = doc.getTextWidth(value);
+    doc.text(subtitle, x + 4 + valueWidth + 3, y + 20); // Espaciado reducido
   }
 };
 
 /**
- * Crea una sección con título y lista de valores
+ * Crea una sección compacta con título y lista de valores
  * @param {Object} doc - Documento PDF
  * @param {Number} x - Posición x inicial
  * @param {Number} y - Posición y inicial
+ * @param {Number} width - Ancho de la tarjeta
  * @param {String} title - Título de la sección
  * @param {Array} items - Array de objetos {label, value, percentage}
  * @returns {Number} Posición y final después de dibujar la sección
  */
-const drawListSection = (doc, x, y, title, items) => {
+const drawListSection = (doc, x, y, width, title, items) => {
+  // Calcular altura más ajustada para el contenido
+  const itemHeight = 4.5; // Altura por ítem aún más reducida
+  const estimatedHeight = Math.max(6 + items.length * itemHeight + 6, 24); // Altura mínima reducida a 24px
+
+  // Dibujar fondo de la tarjeta primero
+  doc.setFillColor(240, 240, 245);
+  doc.roundedRect(x, y, width, estimatedHeight, 2, 2, "F");
+
   // Dibujar título
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(0, 0, 0);
-  doc.text(title, x, y);
+  doc.setFontSize(8); // Tamaño de título reducido
+  doc.setTextColor(50, 50, 50);
+  doc.text(title, x + 4, y + 8); // Posición Y reducida
 
-  y += 8; // Espacio después del título
+  // Posición inicial para los ítems - más cerca del título
+  let itemY = y + 14; // Posición inicial más alta
 
-  // Dibujar items
+  // Dibujar items con compresión de texto
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
+  doc.setFontSize(6.5); // Tamaño de texto aún más reducido
+  doc.setTextColor(0, 0, 0);
 
   items.forEach((item) => {
-    let text = `${item.label}: ${item.value}`;
+    // Calcular ancho disponible evitando desbordamiento
+    const maxLabelWidth = width - 45; // Espacio para valor y porcentaje
+    let label = item.label;
+
+    // Verificar si el texto es demasiado largo y truncarlo
+    if (
+      (doc.getStringUnitWidth(label) * 6.5) / doc.internal.scaleFactor >
+      maxLabelWidth
+    ) {
+      // Truncar el texto para que quepa
+      let truncateLength =
+        Math.floor(
+          (maxLabelWidth * doc.internal.scaleFactor) /
+            (doc.getStringUnitWidth("a") * 6.5)
+        ) - 3;
+      label = label.substring(0, truncateLength) + "...";
+    }
+
+    let text = `${label}: ${item.value}`;
     if (item.percentage) {
       text += ` (${item.percentage}%)`;
     }
 
-    doc.text(text, x, y);
-    y += 7; // Espacio entre elementos
+    doc.text(text, x + 6, itemY);
+    itemY += itemHeight; // Espacio entre elementos reducido
   });
 
-  return y + 5; // Devolver posición final con margen adicional
+  return y + estimatedHeight + 2; // Margen final reducido
 };
 
 /**
@@ -146,38 +178,61 @@ export const exportToPDF = (
     // Crear un nuevo documento PDF
     const doc = new jsPDF("landscape");
 
+    // Definir márgenes y áreas de trabajo
+    const margins = {
+      left: 10,
+      right: 10,
+      top: 14,
+    };
+    const pageWidth = doc.internal.pageSize.width;
+    const workingWidth = pageWidth - margins.left - margins.right;
+
     // Configuración de colores
     const greenColor = [76, 175, 80]; // RGB
     const redColor = [244, 67, 54]; // RGB
     const blueColor = [33, 150, 243]; // RGB
     const neutralColor = [90, 90, 90]; // RGB
 
-    // Establecer datos de la cabecera
+    // Establecer datos de la cabecera - TÍTULO MODIFICADO
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
+    doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
-    doc.text("Informe de Auditoría de Procesadores", 14, 22);
+    doc.text(
+      "Informe Auditoría del Parque Informático General",
+      margins.left,
+      margins.top + 2
+    );
 
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 30);
+    doc.text(
+      `Fecha: ${new Date().toLocaleDateString()}`,
+      margins.left,
+      margins.top + 8
+    );
 
     // Primera página - Resumen y estadísticas
     if (stats) {
-      // Resumen del análisis
+      // Resumen del análisis - título ligeramente reposicionado
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
+      doc.setFontSize(13);
       doc.setTextColor(0, 0, 0);
-      doc.text("Resumen del análisis", 14, 40);
+      doc.text("Resumen del análisis", margins.left, margins.top + 14);
 
       // ===== TARJETAS DE ESTADÍSTICAS =====
+      // Calcular anchos óptimos para tres tarjetas en una fila
+      const cardGap = 4; // Reducir espacio entre tarjetas
+      const cardWidth = (workingWidth - 2 * cardGap) / 3;
+      const cardHeight = 26; // Altura reducida
+      const cardY = margins.top + 18;
+
       // Tarjeta 1: Total equipos
       drawStatCard(
         doc,
-        14, // x
-        45, // y
-        80, // width
-        50, // height
+        margins.left, // x
+        cardY, // y
+        cardWidth, // width
+        cardHeight, // height
         "Total equipos analizados", // title
         stats.totalProcessors.toString(), // value
         null, // subtitle
@@ -187,10 +242,10 @@ export const exportToPDF = (
       // Tarjeta 2: Equipos que cumplen
       drawStatCard(
         doc,
-        100, // x
-        45, // y
-        80, // width
-        50, // height
+        margins.left + cardWidth + cardGap, // x
+        cardY, // y
+        cardWidth, // width
+        cardHeight, // height
         "Equipos que cumplen requisitos", // title
         stats.meetingRequirements.toString(), // value
         `(${stats.complianceRate.toFixed(1)}%)`, // subtitle
@@ -200,10 +255,10 @@ export const exportToPDF = (
       // Tarjeta 3: Equipos que no cumplen
       drawStatCard(
         doc,
-        186, // x
-        45, // y
-        80, // width
-        50, // height
+        margins.left + 2 * (cardWidth + cardGap), // x
+        cardY, // y
+        cardWidth, // width
+        cardHeight, // height
         "Equipos que NO cumplen requisitos", // title
         stats.notMeetingRequirements.toString(), // value
         `(${(100 - stats.complianceRate).toFixed(1)}%)`, // subtitle
@@ -211,6 +266,10 @@ export const exportToPDF = (
       );
 
       // ===== SECCIÓN DISTRIBUCIÓN POR MARCA Y MOTIVOS DE INCUMPLIMIENTO =====
+      // Posicionar estas secciones justo debajo de las tarjetas anteriores
+      const sectionY = cardY + cardHeight + 6; // Reducido el espacio entre secciones
+      const sectionWidth = (workingWidth - cardGap) / 2;
+
       // Preparar datos para distribución por marca
       const brandItems = Object.entries(stats.brandDistribution).map(
         ([brand, count]) => ({
@@ -230,34 +289,48 @@ export const exportToPDF = (
           percentage: ((count / stats.notMeetingRequirements) * 100).toFixed(1),
         }));
 
-      // Dibujar secciones en columnas paralelas
-      drawListSection(doc, 14, 110, "Distribución por marca", brandItems);
-      drawListSection(
+      // Dibujar secciones en columnas paralelas con fondos de tarjeta
+      const leftSectionY = drawListSection(
         doc,
-        150,
-        110,
+        margins.left,
+        sectionY,
+        sectionWidth,
+        "Distribución por marca",
+        brandItems
+      );
+
+      const rightSectionY = drawListSection(
+        doc,
+        margins.left + sectionWidth + cardGap,
+        sectionY,
+        sectionWidth,
         "Principales motivos de incumplimiento",
         failureItems
       );
 
+      // Determinar posición Y para la próxima sección (la más baja de las dos)
+      const nextSectionY = Math.max(leftSectionY, rightSectionY);
+
       // ===== SECCIÓN ESTADÍSTICAS DE RAM =====
       if (stats.ram && stats.ram.total > 0) {
+        // Título de sección RAM
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.text("Estadísticas de Memoria RAM", 14, 170);
+        doc.setFontSize(13);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Estadísticas de Memoria RAM", margins.left, nextSectionY + 4);
 
-        // Cuadros de estadísticas de RAM
-        const cardWidth = 80;
-        const cardHeight = 45;
-        const cardY = 175;
+        // Cuadros de estadísticas de RAM - altura y espaciado reducidos
+        const ramCardY = nextSectionY + 6;
+        const ramCardWidth = (workingWidth - 2 * cardGap) / 3;
+        const ramCardHeight = 26;
 
         // Card 1: Total equipos con RAM
         drawStatCard(
           doc,
-          14, // x
-          cardY, // y
-          cardWidth, // width
-          cardHeight, // height
+          margins.left, // x
+          ramCardY, // y
+          ramCardWidth, // width
+          ramCardHeight, // height
           "Equipos con RAM analizada", // title
           stats.ram.total.toString(), // value
           null, // subtitle
@@ -267,10 +340,10 @@ export const exportToPDF = (
         // Card 2: Promedio RAM
         drawStatCard(
           doc,
-          14 + cardWidth + 10, // x
-          cardY, // y
-          cardWidth, // width
-          cardHeight, // height
+          margins.left + ramCardWidth + cardGap, // x
+          ramCardY, // y
+          ramCardWidth, // width
+          ramCardHeight, // height
           "Promedio de RAM", // title
           `${stats.ram.avg.toFixed(1)} GB`, // value
           null, // subtitle
@@ -286,10 +359,10 @@ export const exportToPDF = (
         if (mostCommonRamSize) {
           drawStatCard(
             doc,
-            14 + (cardWidth + 10) * 2, // x
-            cardY, // y
-            cardWidth, // width
-            cardHeight, // height
+            margins.left + 2 * (ramCardWidth + cardGap), // x
+            ramCardY, // y
+            ramCardWidth, // width
+            ramCardHeight, // height
             "Cantidad más común", // title
             `${mostCommonRamSize[0]} GB`, // value
             null, // subtitle
@@ -306,11 +379,13 @@ export const exportToPDF = (
             percentage: ((count / stats.ram.total) * 100).toFixed(1),
           }));
 
-        // Dibujar distribución por capacidad
+        // Dibujar distribución por capacidad - más compacto
+        const ramDistY = ramCardY + ramCardHeight + 4;
         drawListSection(
           doc,
-          14,
-          cardY + cardHeight + 10,
+          margins.left,
+          ramDistY,
+          workingWidth,
           "Distribución por capacidad",
           ramDistItems
         );
@@ -318,9 +393,14 @@ export const exportToPDF = (
 
       // ===== SECCIÓN ESTADÍSTICAS DE ALMACENAMIENTO =====
       if (stats.storage && stats.storage.total > 0) {
+        // Ajustar espacio vertical si hay sección RAM
+        const storageY =
+          nextSectionY + (stats.ram && stats.ram.total > 0 ? 70 : 0);
+
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.text("Estadísticas de Almacenamiento", 150, 170);
+        doc.setFontSize(13);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Estadísticas de Almacenamiento", margins.left, storageY + 4);
 
         // Preparar texto de almacenamiento promedio
         let avgStorageText = "";
@@ -332,22 +412,18 @@ export const exportToPDF = (
           avgStorageText = `${stats.storage.avgCapacity.toFixed(0)} GB`;
         }
 
-        // Preparar datos para distribución por tipo
-        const storageTypeItems = Object.entries(stats.storage.byType).map(
-          ([type, count]) => ({
-            label: type,
-            value: count,
-            percentage: ((count / stats.storage.total) * 100).toFixed(1),
-          })
-        );
+        // Tarjetas de almacenamiento
+        const storageCardY = storageY + 8;
+        const storageCardWidth = (workingWidth - 2 * cardGap) / 3;
+        const storageCardHeight = 26; // Altura reducida
 
         // Cuadro con total de equipos analizados
         drawStatCard(
           doc,
-          150, // x
-          175, // y
-          80, // width
-          45, // height
+          margins.left, // x
+          storageCardY, // y
+          storageCardWidth, // width
+          storageCardHeight, // height
           "Total equipos analizados", // title
           stats.storage.total.toString(), // value
           null, // subtitle
@@ -357,23 +433,43 @@ export const exportToPDF = (
         // Cuadro con capacidad promedio
         drawStatCard(
           doc,
-          150 + 90, // x
-          175, // y
-          80, // width
-          45, // height
+          margins.left + storageCardWidth + cardGap, // x
+          storageCardY, // y
+          storageCardWidth, // width
+          storageCardHeight, // height
           "Promedio de capacidad", // title
           avgStorageText, // value
           null, // subtitle
           blueColor // colors
         );
 
-        // Dibujar distribución por tipo de almacenamiento
-        drawListSection(
-          doc,
-          150,
-          225,
-          "Distribución por tipo",
-          storageTypeItems
+        // Tercer cuadro para tipo más común
+        // Encontrar el tipo más común
+        const mostCommonType = Object.entries(stats.storage.byType).sort(
+          (a, b) => b[1] - a[1]
+        )[0];
+
+        if (mostCommonType) {
+          drawStatCard(
+            doc,
+            margins.left + 2 * (storageCardWidth + cardGap), // x
+            storageCardY, // y
+            storageCardWidth, // width
+            storageCardHeight, // height
+            "Tipo más común", // title
+            mostCommonType[0], // value
+            null, // subtitle
+            blueColor // colors
+          );
+        }
+
+        // Preparar datos para distribución por tipo
+        const storageTypeItems = Object.entries(stats.storage.byType).map(
+          ([type, count]) => ({
+            label: type,
+            value: count,
+            percentage: ((count / stats.storage.total) * 100).toFixed(1),
+          })
         );
 
         // Preparar datos para capacidades más comunes
@@ -393,13 +489,28 @@ export const exportToPDF = (
             };
           });
 
-        // Mostrar capacidades más comunes si hay datos
+        // Colocar distribuciones de almacenamiento en dos columnas - reducir espacio vertical
+        const storageDistY = storageCardY + storageCardHeight + 4;
+        const storageDistWidth = (workingWidth - cardGap) / 2;
+
+        // Dibujar distribución por tipo
+        drawListSection(
+          doc,
+          margins.left,
+          storageDistY,
+          storageDistWidth,
+          "Distribución por tipo",
+          storageTypeItems
+        );
+
+        // Dibujar capacidades más comunes si hay datos
         if (storageCapacityItems.length > 0) {
           drawListSection(
             doc,
-            150,
-            260,
-            "Capacidades más comunes",
+            margins.left + storageDistWidth + cardGap,
+            storageDistY,
+            storageDistWidth,
+            "Principales capacidades",
             storageCapacityItems
           );
         }
@@ -408,7 +519,11 @@ export const exportToPDF = (
       // Si no hay estadísticas, mostrar una nota
       doc.setFontSize(14);
       doc.setTextColor(100, 100, 100);
-      doc.text("No se encontraron estadísticas para mostrar", 14, 50);
+      doc.text(
+        "No se encontraron estadísticas para mostrar",
+        margins.left,
+        margins.top + 30
+      );
     }
 
     // ===== PÁGINA DE TABLA DE DATOS =====
@@ -416,9 +531,9 @@ export const exportToPDF = (
 
     // Título para la tabla de datos
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
-    doc.text("Detalle de procesadores analizados", 14, 20);
+    doc.text("Detalle de procesadores analizados", margins.left, margins.top);
 
     // Seleccionar SOLO las columnas específicas solicitadas
     const requestedColumns = [
@@ -442,17 +557,7 @@ export const exportToPDF = (
         availableColumns.map((col) => row[col] || "")
       );
 
-      // Calcular anchos automáticamente basado en el contenido
-      const getMeasuredWidth = (text, fontSize) => {
-        if (!text) return 0;
-        return (
-          (doc.getStringUnitWidth(text.toString()) * fontSize) /
-          doc.internal.scaleFactor
-        );
-      };
-
       // Ajustar proporcionalmente para que la tabla se adapte a la página
-      const pageWidth = doc.internal.pageSize.width;
       const pageMargins = { left: 5, right: 5 }; // Reducir márgenes para maximizar espacio
       const availableWidth = pageWidth - pageMargins.left - pageMargins.right;
 
@@ -495,25 +600,25 @@ export const exportToPDF = (
 
       // Crear tabla con datos con más filas por página
       doc.autoTable({
-        startY: 25,
+        startY: margins.top + 5,
         head: [formattedHeaders],
         body: tableData.slice(0, 100),
         theme: "plain",
         headStyles: {
           fillColor: blueColor,
           textColor: [255, 255, 255],
-          fontSize: 8, // Reducir tamaño de fuente
+          fontSize: 7, // Reducir tamaño de fuente
           fontStyle: "normal",
           cellPadding: { top: 1, right: 1, bottom: 1, left: 1 },
           halign: "center",
           valign: "middle",
-          minCellHeight: 8, // Reducir altura mínima
+          minCellHeight: 6, // Reducir altura mínima
         },
         bodyStyles: {
-          fontSize: 7.5, // Reducir aún más el tamaño en el cuerpo
+          fontSize: 7, // Reducir aún más el tamaño en el cuerpo
           cellPadding: { top: 1, right: 1, bottom: 1, left: 1 },
           fontStyle: "normal",
-          minCellHeight: 6, // Muy compacto
+          minCellHeight: 5, // Muy compacto
         },
         alternateRowStyles: {
           fillColor: [248, 248, 248],
@@ -535,7 +640,7 @@ export const exportToPDF = (
                 "F"
               );
               doc.setTextColor(0, 128, 0);
-              doc.setFontSize(7.5);
+              doc.setFontSize(7);
               doc.text(
                 "Sí",
                 data.cell.x + 2,
@@ -551,7 +656,7 @@ export const exportToPDF = (
                 "F"
               );
               doc.setTextColor(180, 0, 0);
-              doc.setFontSize(7.5);
+              doc.setFontSize(7);
               doc.text(
                 "No",
                 data.cell.x + 2,
@@ -561,32 +666,35 @@ export const exportToPDF = (
             return true; // Señalar que hemos personalizado esta celda
           }
         },
-        margin: { top: 25, left: pageMargins.left, right: pageMargins.right },
+        margin: {
+          top: margins.top + 5,
+          left: pageMargins.left,
+          right: pageMargins.right,
+        },
         tableWidth: "auto",
         showHead: "everyPage",
         didDrawPage: function (data) {
           // Agregar nota de pie
           const currentDate = new Date().toLocaleString();
-          doc.setFontSize(7); // Reducir tamaño de fuente del pie de página
+          doc.setFontSize(6.5); // Reducir tamaño de fuente del pie de página
           doc.setTextColor(150, 150, 150);
           doc.text(
             `Reporte generado el ${currentDate}. Se muestran hasta 100 equipos.`,
-            14,
-            doc.internal.pageSize.height - 5
+            margins.left,
+            doc.internal.pageSize.height - 4
           );
         },
       });
     } else {
       // Fallback: Crear una tabla básica sin autoTable
-      let startY = 30;
-      const rowHeight = 8; // Altura reducida para más filas por página
-      const headerRowHeight = 10;
-      const fontSize = 7;
-      const headerFontSize = 8;
+      let startY = margins.top + 8;
+      const rowHeight = 6; // Altura reducida para más filas por página
+      const headerRowHeight = 8;
+      const fontSize = 6.5;
+      const headerFontSize = 7;
 
       // Ajustar márgenes para maximizar espacio
       const leftMargin = 5;
-      const pageWidth = doc.internal.pageSize.width;
       const availableWidth = pageWidth - 2 * leftMargin;
 
       // Proporciones para cada columna (como % del espacio disponible)
@@ -664,14 +772,14 @@ export const exportToPDF = (
 
       // Calcular cuántas filas caben en una página
       const pageHeight = doc.internal.pageSize.height;
-      const maxRowsPerPage = Math.floor((pageHeight - startY - 10) / rowHeight);
+      const maxRowsPerPage = Math.floor((pageHeight - startY - 8) / rowHeight);
 
       // Mostrar datos en páginas
       for (let i = 0; i < Math.min(data.length, 100); i++) {
         // Verificar si necesitamos una nueva página
         if (i > 0 && i % maxRowsPerPage === 0) {
           doc.addPage();
-          startY = 30;
+          startY = margins.top + 6;
 
           // Volver a dibujar encabezados en la nueva página
           doc.setFillColor(33, 150, 243);
@@ -685,13 +793,28 @@ export const exportToPDF = (
             // Dividir encabezado usando la función helper
             const headerLines = splitHeaderText(col);
 
-            // Centrar cada línea del encabezado
-            headerLines.forEach((line, lineIndex) => {
-              const lineCount = headerLines.length;
-              const lineHeight = headerRowHeight / (lineCount + 0.5);
-              const yPos = startY + 3 + lineIndex * lineHeight;
-              doc.text(line, colX + width / 2, yPos, { align: "center" });
-            });
+            // Calcular posiciones antes de pasar a la función
+            const currentX = colX;
+            const currentY = startY;
+
+            // Función para dibujar líneas de encabezado con variables capturadas por valor
+            const drawHeaderLines = (lines, x, width, y, rowHeight) => {
+              lines.forEach((line, lineIndex) => {
+                const lineCount = lines.length;
+                const lineHeight = rowHeight / (lineCount + 0.5);
+                const yPos = y + 3 + lineIndex * lineHeight;
+                doc.text(line, x + width / 2, yPos, { align: "center" });
+              });
+            };
+
+            // Llamar a la función con los valores actuales
+            drawHeaderLines(
+              headerLines,
+              currentX,
+              width,
+              currentY,
+              headerRowHeight
+            );
 
             colX += width;
           });
@@ -747,12 +870,12 @@ export const exportToPDF = (
 
       // Agregar nota de pie
       const currentDate = new Date().toLocaleString();
-      doc.setFontSize(7);
+      doc.setFontSize(6.5);
       doc.setTextColor(150, 150, 150);
       doc.text(
         `Reporte generado el ${currentDate}. Se muestran hasta 100 equipos.`,
         leftMargin,
-        doc.internal.pageSize.height - 5
+        pageHeight - 4
       );
     }
 
@@ -767,7 +890,7 @@ export const exportToPDF = (
       const doc = new jsPDF();
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.text("Reporte básico de procesadores", 20, 20);
+      doc.text("Informe Auditoría del Parque Informático General", 20, 20);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(12);
@@ -846,33 +969,42 @@ export const exportDetailedReport = (
     // Crear un nuevo documento PDF
     const doc = new jsPDF();
 
+    // Definir márgenes y áreas de trabajo
+    const margins = {
+      left: 14,
+      right: 14,
+      top: 20,
+    };
+    const pageWidth = doc.internal.pageSize.width;
+    const workingWidth = pageWidth - margins.left - margins.right;
+
     // Configuración de estilos
-    const titleFont = { size: 22, style: "bold" };
-    const subtitleFont = { size: 16, style: "bold" };
-    const normalFont = { size: 12, style: "normal" };
-    const blueColor = [33, 150, 243]; // RGB azul
+    const titleFont = { size: 20, style: "bold" };
+    const subtitleFont = { size: 14, style: "bold" };
+    const normalFont = { size: 11, style: "normal" };
 
     // Colores
     const primaryColor = [41, 98, 255]; // RGB azul
+    const blueColor = [33, 150, 243]; // RGB azul para tablas
 
     // Portada
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 0, 30, doc.internal.pageSize.height, "F");
+    doc.rect(0, 0, 20, doc.internal.pageSize.height, "F");
 
     doc.setFont("helvetica", titleFont.style);
     doc.setFontSize(titleFont.size);
     doc.setTextColor(0, 0, 0);
-    doc.text("Informe de Auditoría", 40, 40);
-    doc.text("Parque Informático", 40, 55);
+    doc.text("Informe Auditoría del", 30, 40);
+    doc.text("Parque Informático General", 30, 50);
 
     doc.setFont("helvetica", normalFont.style);
     doc.setFontSize(normalFont.size);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 40, 75);
-    doc.text(`Total de equipos analizados: ${stats.totalProcessors}`, 40, 85);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 30, 70);
+    doc.text(`Total de equipos analizados: ${stats.totalProcessors}`, 30, 80);
     doc.text(
       `Tasa de cumplimiento: ${stats.complianceRate.toFixed(1)}%`,
-      40,
-      95
+      30,
+      90
     );
 
     // Primera página - Resumen ejecutivo
@@ -880,95 +1012,129 @@ export const exportDetailedReport = (
 
     doc.setFont("helvetica", subtitleFont.style);
     doc.setFontSize(subtitleFont.size);
-    doc.text("Resumen Ejecutivo", 14, 20);
+    doc.text("Resumen Ejecutivo", margins.left, margins.top);
 
     doc.setFont("helvetica", normalFont.style);
     doc.setFontSize(normalFont.size);
     doc.text(
       "Este informe presenta los resultados del análisis realizado sobre el parque",
-      14,
-      35
+      margins.left,
+      margins.top + 12
     );
     doc.text(
       "informático para determinar el cumplimiento de los requisitos mínimos de hardware.",
-      14,
-      45
+      margins.left,
+      margins.top + 20
     );
 
-    // Cuadro resumen - Convertido a tarjeta
+    // Cuadro resumen - Convertido a tarjeta (altura reducida)
     doc.setFillColor(240, 240, 245);
-    doc.roundedRect(14, 55, 180, 60, 3, 3, "F");
+    doc.roundedRect(
+      margins.left,
+      margins.top + 25,
+      workingWidth,
+      45,
+      3,
+      3,
+      "F"
+    );
 
     doc.setFont("helvetica", "bold");
-    doc.text("Resultados clave:", 20, 65);
+    doc.text("Resultados clave:", margins.left + 5, margins.top + 35);
 
     doc.setFont("helvetica", "normal");
-    doc.text(`• Total de equipos analizados: ${stats.totalProcessors}`, 20, 80);
+    doc.text(
+      `• Total de equipos analizados: ${stats.totalProcessors}`,
+      margins.left + 5,
+      margins.top + 45
+    );
     doc.text(
       `• Equipos que cumplen requisitos: ${
         stats.meetingRequirements
       } (${stats.complianceRate.toFixed(1)}%)`,
-      20,
-      90
+      margins.left + 5,
+      margins.top + 55
     );
     doc.text(
       `• Equipos que no cumplen: ${stats.notMeetingRequirements} (${(
         100 - stats.complianceRate
       ).toFixed(1)}%)`,
-      20,
-      100
+      margins.left + 5,
+      margins.top + 65
     );
 
     // Principales hallazgos
     doc.setFont("helvetica", subtitleFont.style);
     doc.setFontSize(subtitleFont.size);
-    doc.text("Principales Hallazgos", 14, 130);
+    doc.text("Principales Hallazgos", margins.left, margins.top + 85);
 
     // Crear tarjetas para distribución por marca y motivos de incumplimiento
+    const cardGap = 8;
+    const cardWidth = (workingWidth - cardGap) / 2;
+
     doc.setFillColor(240, 240, 245);
-    doc.roundedRect(14, 140, 80, 80, 3, 3, "F");
-    doc.roundedRect(110, 140, 80, 80, 3, 3, "F");
+    doc.roundedRect(margins.left, margins.top + 90, cardWidth, 55, 3, 3, "F");
+    doc.roundedRect(
+      margins.left + cardWidth + cardGap,
+      margins.top + 90,
+      cardWidth,
+      55,
+      3,
+      3,
+      "F"
+    );
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setTextColor(50, 50, 50);
-    doc.text("Distribución por marca", 20, 150);
-    doc.text("Principales motivos de incumplimiento", 115, 150);
+    doc.text("Distribución por marca", margins.left + 5, margins.top + 100);
+    doc.text(
+      "Principales motivos de incumplimiento",
+      margins.left + cardWidth + cardGap + 5,
+      margins.top + 100
+    );
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
 
     // Crear resumen de marcas
-    let brandY = 160;
+    let brandY = margins.top + 110;
     Object.entries(stats.brandDistribution)
       .sort((a, b) => b[1] - a[1])
       .forEach(([brand, count]) => {
         const percentage = ((count / stats.totalProcessors) * 100).toFixed(1);
-        doc.text(`${brand}: ${count} (${percentage}%)`, 20, brandY);
-        brandY += 8;
+        doc.text(
+          `${brand}: ${count} (${percentage}%)`,
+          margins.left + 8,
+          brandY
+        );
+        brandY += 7;
       });
 
     // Principales motivos de fallo
-    let failureY = 160;
+    let failureY = margins.top + 110;
     Object.entries(stats.failureReasons || {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .forEach((reason) => {
+      .forEach((reason, index) => {
         const percentage = (
           (reason[1] / stats.notMeetingRequirements) *
           100
         ).toFixed(1);
-        const shortReason =
-          reason[0].length > 25
-            ? reason[0].substring(0, 22) + "..."
-            : reason[0];
+
+        // Truncar razones demasiado largas
+        let displayReason = reason[0];
+        if (displayReason.length > 30) {
+          displayReason = displayReason.substring(0, 27) + "...";
+        }
+
         doc.text(
-          `${shortReason}: ${reason[1]} (${percentage}%)`,
-          115,
+          `${index + 1}. ${displayReason}: ${reason[1]} (${percentage}%)`,
+          margins.left + cardWidth + cardGap + 8,
           failureY
         );
-        failureY += 8;
+        failureY += 7;
       });
 
     // Recomendaciones
@@ -976,11 +1142,19 @@ export const exportDetailedReport = (
 
     doc.setFont("helvetica", subtitleFont.style);
     doc.setFontSize(subtitleFont.size);
-    doc.text("Recomendaciones", 14, 20);
+    doc.text("Recomendaciones", margins.left, margins.top);
 
-    // Tarjeta para recomendaciones
+    // Tarjeta para recomendaciones (altura ajustada)
     doc.setFillColor(240, 240, 245);
-    doc.roundedRect(14, 30, 180, 100, 3, 3, "F");
+    doc.roundedRect(
+      margins.left,
+      margins.top + 10,
+      workingWidth,
+      85,
+      3,
+      3,
+      "F"
+    );
 
     doc.setFont("helvetica", normalFont.style);
     doc.setFontSize(normalFont.size);
@@ -1024,15 +1198,15 @@ export const exportDetailedReport = (
       "   mínimas para garantizar mayor vida útil y mejor rendimiento."
     );
 
-    doc.text(recommendationText.join("\n"), 20, 45);
+    doc.text(recommendationText.join("\n"), margins.left + 5, margins.top + 20);
 
     // Agregar tabla de procesadores analizados con las mismas mejoras que en exportToPDF
     doc.addPage();
 
     // Título para la tabla
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("Detalle de Procesadores Analizados", 14, 20);
+    doc.setFontSize(14);
+    doc.text("Detalle de Procesadores Analizados", margins.left, margins.top);
 
     // Seleccionar columnas específicas
     const requestedColumns = [
@@ -1053,17 +1227,7 @@ export const exportDetailedReport = (
     );
 
     if (autoTableLoaded && typeof doc.autoTable === "function") {
-      // Usar la misma función que en exportToPDF para calcular los anchos
-      const getMeasuredWidth = (text, fontSize) => {
-        if (!text) return 0;
-        return (
-          (doc.getStringUnitWidth(text.toString()) * fontSize) /
-          doc.internal.scaleFactor
-        );
-      };
-
       // Ajustar proporcionalmente para que la tabla se adapte a la página
-      const pageWidth = doc.internal.pageSize.width;
       const pageMargins = { left: 5, right: 5 };
       const availableWidth = pageWidth - pageMargins.left - pageMargins.right;
 
@@ -1110,31 +1274,35 @@ export const exportDetailedReport = (
       });
 
       doc.autoTable({
-        startY: 25,
+        startY: margins.top + 5,
         head: [formattedHeaders],
         body: tableData.slice(0, 100),
         theme: "plain",
         headStyles: {
           fillColor: blueColor,
           textColor: [255, 255, 255],
-          fontSize: 8,
+          fontSize: 7,
           fontStyle: "normal",
           cellPadding: { top: 1, right: 1, bottom: 1, left: 1 },
           halign: "center",
           valign: "middle",
-          minCellHeight: 8,
+          minCellHeight: 6,
         },
         bodyStyles: {
-          fontSize: 7.5,
+          fontSize: 7,
           cellPadding: { top: 1, right: 1, bottom: 1, left: 1 },
           fontStyle: "normal",
-          minCellHeight: 6,
+          minCellHeight: 5,
         },
         alternateRowStyles: {
           fillColor: [248, 248, 248],
         },
         columnStyles: columnStyles,
-        margin: { top: 25, left: pageMargins.left, right: pageMargins.right },
+        margin: {
+          top: margins.top + 5,
+          left: pageMargins.left,
+          right: pageMargins.right,
+        },
         didDrawCell: (data) => {
           // Colorear celdas de cumplimiento
           if (
@@ -1151,7 +1319,7 @@ export const exportDetailedReport = (
                 "F"
               );
               doc.setTextColor(0, 128, 0);
-              doc.setFontSize(7.5);
+              doc.setFontSize(7);
               doc.text(
                 "Sí",
                 data.cell.x + 2,
@@ -1167,7 +1335,7 @@ export const exportDetailedReport = (
                 "F"
               );
               doc.setTextColor(180, 0, 0);
-              doc.setFontSize(7.5);
+              doc.setFontSize(7);
               doc.text(
                 "No",
                 data.cell.x + 2,
@@ -1185,7 +1353,7 @@ export const exportDetailedReport = (
           doc.setTextColor(150, 150, 150);
           doc.text(
             `Reporte generado el ${currentDate}. Se muestran hasta 100 equipos.`,
-            14,
+            margins.left,
             doc.internal.pageSize.height - 5
           );
         },
@@ -1195,8 +1363,8 @@ export const exportDetailedReport = (
       doc.setFontSize(10);
       doc.text(
         "No se puede mostrar la tabla detallada. Use la exportación a Excel.",
-        14,
-        30
+        margins.left,
+        margins.top + 10
       );
     }
 
