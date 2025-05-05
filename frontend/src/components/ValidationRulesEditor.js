@@ -1,7 +1,9 @@
 // components/ValidationRulesEditor.js
-import React, { useState, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { ValidationRulesContext } from "../context/ValidationRulesContext";
 import { ThemeContext } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
+import ApiService from "../services/apiService";
 import {
   Settings,
   Save,
@@ -15,14 +17,51 @@ import {
 } from "lucide-react";
 
 const ValidationRulesEditor = () => {
-  const { rules, updateRules, resetRules, exportRules, importRules } =
-    useContext(ValidationRulesContext);
+  const { rules, updateRules, resetRules } = useContext(ValidationRulesContext);
   const { isDarkMode } = useContext(ThemeContext);
+  const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [editedRules, setEditedRules] = useState(rules);
   const [activeSection, setActiveSection] = useState("intelCore");
   const [notification, setNotification] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [savedRules, setSavedRules] = useState([]);
   const fileInputRef = useRef(null);
+
+  // Cargar reglas cuando cambie el contexto
+  useEffect(() => {
+    setEditedRules(rules);
+  }, [rules]);
+
+  // Cargar reglas del servidor si está autenticado
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadRulesFromServer();
+    }
+  }, [isAuthenticated]);
+
+  // Función para cargar reglas desde el servidor
+  const loadRulesFromServer = async () => {
+    setIsLoading(true);
+    try {
+      // Primero intentar cargar la regla predeterminada
+      const response = await ApiService.getDefaultRule();
+      if (response.success && response.rule) {
+        updateRules(response.rule.rules_json);
+        setEditedRules(response.rule.rules_json);
+      }
+
+      // Cargar la lista de todas las reglas guardadas
+      const allRulesResponse = await ApiService.getRules();
+      if (allRulesResponse.success) {
+        setSavedRules(allRulesResponse.rules);
+      }
+    } catch (error) {
+      console.error("Error al cargar reglas:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Manejar cambios en los inputs
   const handleChange = (category, processor, field, value) => {
@@ -76,9 +115,45 @@ const ValidationRulesEditor = () => {
   };
 
   // Guardar cambios
-  const saveChanges = () => {
+  const saveChanges = async () => {
+    // Actualizar en el contexto local
     updateRules(editedRules);
-    showNotification("success", "Reglas guardadas correctamente");
+
+    // Si está autenticado, guardar en el servidor
+    if (isAuthenticated) {
+      setIsLoading(true);
+      try {
+        // Verificar si hay una regla predeterminada para actualizar
+        let defaultRule = savedRules.find((rule) => rule.is_default);
+
+        if (defaultRule) {
+          // Actualizar la regla existente
+          await ApiService.updateRule(defaultRule.id, {
+            rules_json: editedRules,
+            is_default: true,
+          });
+        } else {
+          // Crear una nueva regla predeterminada
+          await ApiService.createRule({
+            name: "Configuración predeterminada",
+            rules_json: editedRules,
+            is_default: true,
+          });
+
+          // Recargar la lista de reglas
+          loadRulesFromServer();
+        }
+
+        showNotification("success", "Reglas guardadas correctamente");
+      } catch (error) {
+        console.error("Error al guardar reglas:", error);
+        showNotification("error", "Error al guardar las reglas");
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      showNotification("success", "Reglas guardadas en localStorage");
+    }
   };
 
   // Restablecer reglas
@@ -105,18 +180,53 @@ const ValidationRulesEditor = () => {
     }, 3000);
   };
 
+  // Exportar reglas
+  const handleExportRules = () => {
+    const dataStr = JSON.stringify(editedRules, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const dataUrl = URL.createObjectURL(dataBlob);
+
+    const downloadLink = document.createElement("a");
+    downloadLink.href = dataUrl;
+    downloadLink.download = "reglas_validacion.json";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+
+    showNotification("success", "Reglas exportadas correctamente");
+  };
+
   // Importar reglas
-  const handleImport = (e) => {
+  const handleImportRules = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const result = importRules(file);
-      if (result && result.success) {
-        setEditedRules(rules);
-        showNotification("success", result.message);
-      } else {
-        showNotification("error", result.message);
-      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedRules = JSON.parse(e.target.result);
+
+          // Validar estructura básica
+          if (
+            importedRules.intelCore &&
+            importedRules.amdRyzen &&
+            importedRules.otherProcessors
+          ) {
+            setEditedRules(importedRules);
+            saveChanges(); // Guardar las reglas importadas
+            showNotification("success", "Reglas importadas correctamente");
+          } else {
+            showNotification(
+              "error",
+              "El archivo no contiene un formato válido de reglas"
+            );
+          }
+        } catch (error) {
+          showNotification("error", "Error al importar: " + error.message);
+        }
+      };
+      reader.readAsText(file);
     }
+
     // Limpiar input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -134,7 +244,7 @@ const ValidationRulesEditor = () => {
           isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
         }`}
       >
-        <h4 className="font-medium mb-3">{processor.name}</h4>
+        <h4 className="mb-3 font-medium">{processor.name}</h4>
 
         {category === "otherProcessors" && (
           <div className="mb-3">
@@ -150,7 +260,7 @@ const ValidationRulesEditor = () => {
                     e.target.checked
                   )
                 }
-                className="form-checkbox h-4 w-4 text-blue-600"
+                className="w-4 h-4 text-blue-600 form-checkbox"
               />
               <span className="ml-2 text-sm">Considerar como válido</span>
             </label>
@@ -159,7 +269,7 @@ const ValidationRulesEditor = () => {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block mb-1 text-sm font-medium">
               Generación mínima
             </label>
             <input
@@ -181,13 +291,13 @@ const ValidationRulesEditor = () => {
                   : "bg-white border-gray-300"
               }`}
             />
-            <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               0 = cualquiera
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block mb-1 text-sm font-medium">
               Velocidad mínima (GHz)
             </label>
             <input
@@ -204,7 +314,7 @@ const ValidationRulesEditor = () => {
                   : "bg-white border-gray-300"
               }`}
             />
-            <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               0 = cualquiera
             </p>
           </div>
@@ -226,7 +336,7 @@ const ValidationRulesEditor = () => {
         } flex justify-between items-center cursor-pointer`}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <h2 className="text-xl font-semibold flex items-center">
+        <h2 className="flex items-center text-xl font-semibold">
           <Settings className="mr-2" size={22} />
           Configuración de reglas de validación
         </h2>
@@ -260,6 +370,13 @@ const ValidationRulesEditor = () => {
             </div>
           )}
 
+          {isLoading && (
+            <div className="flex items-center p-3 mb-4 text-blue-800 bg-blue-100 rounded-md dark:bg-blue-900 dark:text-blue-100">
+              <RefreshCw className="mr-2 animate-spin" size={18} />
+              <span>Cargando reglas...</span>
+            </div>
+          )}
+
           {/* Descripción */}
           <p
             className={`mb-4 ${
@@ -271,7 +388,7 @@ const ValidationRulesEditor = () => {
           </p>
 
           {/* Navegación entre secciones */}
-          <div className="flex border-b mb-4 flex-wrap">
+          <div className="flex flex-wrap mb-4 border-b">
             <button
               className={`py-2 px-4 font-medium ${
                 activeSection === "intelCore"
@@ -348,7 +465,7 @@ const ValidationRulesEditor = () => {
           <div className="mt-4">
             {activeSection === "intelCore" && (
               <>
-                <h3 className="text-lg font-medium mb-3">
+                <h3 className="mb-3 text-lg font-medium">
                   Procesadores Intel Core
                 </h3>
                 {Object.keys(editedRules.intelCore).map((processorKey) =>
@@ -359,7 +476,7 @@ const ValidationRulesEditor = () => {
 
             {activeSection === "amdRyzen" && (
               <>
-                <h3 className="text-lg font-medium mb-3">
+                <h3 className="mb-3 text-lg font-medium">
                   Procesadores AMD Ryzen
                 </h3>
                 {Object.keys(editedRules.amdRyzen).map((processorKey) =>
@@ -370,7 +487,7 @@ const ValidationRulesEditor = () => {
 
             {activeSection === "otherProcessors" && (
               <>
-                <h3 className="text-lg font-medium mb-3">Otros procesadores</h3>
+                <h3 className="mb-3 text-lg font-medium">Otros procesadores</h3>
                 {Object.keys(editedRules.otherProcessors).map((processorKey) =>
                   renderProcessorFields("otherProcessors", processorKey)
                 )}
@@ -379,17 +496,17 @@ const ValidationRulesEditor = () => {
 
             {activeSection === "ram" && (
               <>
-                <h3 className="text-lg font-medium mb-3">Memoria RAM</h3>
+                <h3 className="mb-3 text-lg font-medium">Memoria RAM</h3>
                 <div
                   className={`p-4 mb-2 rounded-lg ${
                     isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
                   }`}
                 >
-                  <h4 className="font-medium mb-3">
+                  <h4 className="mb-3 font-medium">
                     Configuración de Memoria RAM
                   </h4>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">
+                    <label className="block mb-1 text-sm font-medium">
                       Capacidad mínima (GB)
                     </label>
                     <input
@@ -406,7 +523,7 @@ const ValidationRulesEditor = () => {
                           : "bg-white border-gray-300"
                       }`}
                     />
-                    <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Capacidad mínima requerida en GB
                     </p>
                   </div>
@@ -416,17 +533,17 @@ const ValidationRulesEditor = () => {
 
             {activeSection === "storage" && (
               <>
-                <h3 className="text-lg font-medium mb-3">Almacenamiento</h3>
+                <h3 className="mb-3 text-lg font-medium">Almacenamiento</h3>
                 <div
                   className={`p-4 mb-2 rounded-lg ${
                     isDarkMode ? "bg-dark-bg-tertiary" : "bg-gray-50"
                   }`}
                 >
-                  <h4 className="font-medium mb-3">
+                  <h4 className="mb-3 font-medium">
                     Configuración de Almacenamiento
                   </h4>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">
+                    <label className="block mb-1 text-sm font-medium">
                       Capacidad mínima (GB)
                     </label>
                     <input
@@ -448,7 +565,7 @@ const ValidationRulesEditor = () => {
                           : "bg-white border-gray-300"
                       }`}
                     />
-                    <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Capacidad mínima requerida en GB
                     </p>
                   </div>
@@ -465,11 +582,11 @@ const ValidationRulesEditor = () => {
                             e.target.checked
                           )
                         }
-                        className="form-checkbox h-4 w-4 text-blue-600"
+                        className="w-4 h-4 text-blue-600 form-checkbox"
                       />
                       <span className="ml-2 text-sm">Preferir SSD</span>
                     </label>
-                    <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Si está marcado, solo se considerarán válidos los SSD
                     </p>
                   </div>
@@ -479,11 +596,14 @@ const ValidationRulesEditor = () => {
           </div>
 
           {/* Controles */}
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 mt-6">
             <button
               onClick={saveChanges}
+              disabled={isLoading}
               className={`inline-flex items-center px-4 py-2 ${
-                isDarkMode
+                isLoading
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400"
+                  : isDarkMode
                   ? "bg-blue-700 hover:bg-blue-800"
                   : "bg-blue-600 hover:bg-blue-700"
               } text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors`}
@@ -494,8 +614,11 @@ const ValidationRulesEditor = () => {
 
             <button
               onClick={handleReset}
+              disabled={isLoading}
               className={`inline-flex items-center px-4 py-2 ${
-                isDarkMode
+                isLoading
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400"
+                  : isDarkMode
                   ? "bg-amber-700 hover:bg-amber-800"
                   : "bg-amber-600 hover:bg-amber-700"
               } text-white rounded-lg focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 transition-colors`}
@@ -505,9 +628,12 @@ const ValidationRulesEditor = () => {
             </button>
 
             <button
-              onClick={exportRules}
+              onClick={handleExportRules}
+              disabled={isLoading}
               className={`inline-flex items-center px-4 py-2 ${
-                isDarkMode
+                isLoading
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400"
+                  : isDarkMode
                   ? "bg-green-700 hover:bg-green-800"
                   : "bg-green-600 hover:bg-green-700"
               } text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors`}
@@ -521,14 +647,16 @@ const ValidationRulesEditor = () => {
                 type="file"
                 ref={fileInputRef}
                 accept=".json"
-                onChange={handleImport}
+                onChange={handleImportRules}
                 className="hidden"
                 id="import-rules"
               />
               <label
                 htmlFor="import-rules"
                 className={`inline-flex items-center px-4 py-2 cursor-pointer ${
-                  isDarkMode
+                  isLoading
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400"
+                    : isDarkMode
                     ? "bg-purple-700 hover:bg-purple-800"
                     : "bg-purple-600 hover:bg-purple-700"
                 } text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors`}
@@ -549,6 +677,30 @@ const ValidationRulesEditor = () => {
               <X className="mr-2" size={18} />
               Cerrar
             </button>
+          </div>
+
+          {/* Nota informativa */}
+          <div
+            className={`mt-6 p-3 rounded-md text-sm ${
+              isDarkMode
+                ? "bg-dark-bg-tertiary text-dark-text-secondary"
+                : "bg-gray-50 text-gray-600"
+            }`}
+          >
+            <div className="flex items-start">
+              <AlertTriangle className="mr-2 mt-0.5 flex-shrink-0" size={16} />
+              <div>
+                <p>
+                  {isAuthenticated
+                    ? "Las reglas se guardan en la nube y están disponibles desde cualquier dispositivo cuando inicia sesión."
+                    : "Actualmente las reglas se guardan solo en este navegador. Inicie sesión para guardarlas en la nube."}
+                </p>
+                <p className="mt-1">
+                  También puede exportar e importar sus reglas como archivos
+                  JSON para compartirlas o guardarlas localmente.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
