@@ -89,15 +89,20 @@ const login = async (req, res) => {
       });
     }
 
+    console.log(`Intento de login: Usuario=${username}`);
+
     // Verificar credenciales
     const user = await User.verifyCredentials(username, password);
 
     if (!user) {
+      console.log(`Login fallido para usuario: ${username}`);
       return res.status(401).json({
         success: false,
         message: "Credenciales inválidas",
       });
     }
+
+    console.log(`Login exitoso: Usuario=${user.username}, ID=${user.id}`);
 
     // Generar token
     const token = generateToken(user.id);

@@ -20,11 +20,12 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json({ limit: "50mb" })); // Para archivos grandes
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Configuración de CORS
+// Configuración de CORS más permisiva para desarrollo
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: true, // Permite solicitudes desde cualquier origen en desarrollo
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );

@@ -156,19 +156,28 @@ class User {
       );
 
       if (!rows.length) {
+        console.log(`Usuario no encontrado: ${username}`);
         return null;
       }
 
       const user = rows[0];
-      const isPasswordValid = await bcrypt.compare(password, user.password);
+      console.log(`Comparando contraseña para usuario: ${user.username}`);
 
-      if (!isPasswordValid) {
+      try {
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        console.log(`Resultado de comparación: ${isPasswordValid}`);
+
+        if (!isPasswordValid) {
+          return null;
+        }
+
+        // No devolver la contraseña
+        const { password: _, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      } catch (bcryptError) {
+        console.error("Error en bcrypt.compare:", bcryptError);
         return null;
       }
-
-      // No devolver la contraseña
-      const { password: _, ...userWithoutPassword } = user;
-      return userWithoutPassword;
     } catch (error) {
       console.error("Error al verificar credenciales:", error);
       throw error;

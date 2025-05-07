@@ -1,6 +1,3 @@
-//modificamos el frontend para que use nuestra nueva API en lugar del almacenamiento local.
-// creando un servicio de API para el frontend:
-
 // services/apiService.js
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
@@ -40,7 +37,6 @@ class ApiService {
     const options = {
       method,
       headers: this.getHeaders(!isFormData), // No incluir Content-Type para FormData
-      credentials: "include",
     };
 
     if (data) {
@@ -52,12 +48,16 @@ class ApiService {
     }
 
     try {
+      console.log(`Realizando petición ${method} a ${url}`);
+
       const response = await fetch(url, options);
+      console.log(`Respuesta recibida: Status ${response.status}`);
 
       // Si la respuesta no es JSON, lanzar error
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
         const json = await response.json();
+        console.log("Respuesta JSON:", json);
 
         // Si la respuesta no es exitosa, lanzar error
         if (!response.ok) {
@@ -70,6 +70,7 @@ class ApiService {
         return json;
       } else {
         const text = await response.text();
+        console.log("Respuesta no-JSON:", text);
         throw new Error(text || "Respuesta no válida");
       }
     } catch (error) {

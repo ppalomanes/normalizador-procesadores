@@ -1,14 +1,17 @@
 // App.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
 } from "react-router-dom";
-import { ThemeProvider } from "./context/ThemeContext";
-import { ValidationRulesProvider } from "./context/ValidationRulesContext";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeContext, ThemeProvider } from "./context/ThemeContext";
+import {
+  ValidationRulesContext,
+  ValidationRulesProvider,
+} from "./context/ValidationRulesContext";
+import { AuthContext, AuthProvider, useAuth } from "./context/AuthContext";
 
 // Componentes principales
 import Header from "./components/Header";
@@ -50,8 +53,8 @@ const ProtectedRoute = ({ children }) => {
 
 // Contenido principal de la aplicación
 function AppContent() {
-  const { isDarkMode } = React.useContext(ThemeContext);
-  const { rules } = React.useContext(ValidationRulesContext);
+  const { isDarkMode } = useContext(ThemeContext);
+  const { rules } = useContext(ValidationRulesContext);
   const [file, setFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);

@@ -31,7 +31,11 @@ const Login = () => {
       await login(formData);
       navigate("/"); // Redireccionar al dashboard después del login
     } catch (error) {
-      setError(error.message || "Error al iniciar sesión");
+      console.error("Error en login:", error);
+      setError(
+        error.message ||
+          "Error al iniciar sesión. Compruebe que el servidor backend está funcionando."
+      );
     } finally {
       setIsLoading(false);
     }
